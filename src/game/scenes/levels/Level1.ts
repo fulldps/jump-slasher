@@ -27,9 +27,9 @@ export class Level1 extends LevelBase {
 
     protected buildLevel() {
         // Земля
-        this.platform =
-            // Платформы
-            this.platforms.create(300, 600, "platform");
+        // this.platform =
+        // Платформы
+        this.platforms.create(300, 600, "platform");
         this.platforms.create(700, 500, "platform");
         this.platforms.create(200, 400, "platform");
         this.platforms.create(600, 300, "platform");
