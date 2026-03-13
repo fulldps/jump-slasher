@@ -5,24 +5,27 @@ export class Preloader extends Scene {
         super("Preloader");
     }
 
-    init() {
-        // Инициализация (например, создание графики для полосы загрузки)
-    }
-
     preload() {
-        // Загружайте ассеты здесь:
-        // this.load.setPath("assets");
-        // this.load.image("myImage", "image.png");
-        this.load.image("backfround", "bg.png");
         this.load.setPath("assets");
+
+        // Фон
+        this.load.image("background", "bg.png"); // ✅ исправил опечатку
+
+        // Игрок
         this.load.spritesheet("player", "characters.png", {
+            frameWidth: 32,
+            frameHeight: 32,
+        });
+
+        // Платформы
+        this.load.image("ground", "ground.png");
+        this.load.spritesheet("platform", "platform.png", {
             frameWidth: 32,
             frameHeight: 32,
         });
     }
 
     create() {
-        // Когда всё загружено, переходим в меню
-        this.scene.start("Game");
+        this.scene.start("Game"); // Game → Level1
     }
 }

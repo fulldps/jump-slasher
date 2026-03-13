@@ -1,9 +1,11 @@
 import { Boot } from "./scenes/Boot";
-import { GameOver } from "./scenes/GameOver";
-import { Game as MainGame } from "./scenes/Game";
-import { MainMenu } from "./scenes/MainMenu";
 import { Preloader } from "./scenes/Preloader";
-import { AUTO, Game } from "phaser";
+import { MainMenu } from "./scenes/MainMenu";
+import { Game } from "./scenes/Game";
+import { Level1 } from "./scenes/levels/Level1";
+// import { Level2 } from "./scenes/levels/Level2"; // раскомментируй, когда создашь
+import { GameOver } from "./scenes/GameOver";
+import { AUTO, Game as PhaserGame } from "phaser";
 
 const config: Phaser.Types.Core.GameConfig = {
     type: AUTO,
@@ -14,19 +16,27 @@ const config: Phaser.Types.Core.GameConfig = {
     physics: {
         default: "arcade",
         arcade: {
-            gravity: { x: 0, y: 500 }, // Гравитация по нулям для чистого старта
-            debug: true,
+            gravity: { y: 500 },
+            debug: false, // ← выключи дебаг, когда всё заработает
         },
     },
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
     },
-    scene: [Boot, Preloader, MainMenu, MainGame, GameOver],
+    scene: [
+        Boot,
+        Preloader,
+        MainMenu,
+        Game, // менеджер → запускает Level1
+        Level1,
+        // Level2,
+        GameOver,
+    ],
 };
 
 const StartGame = (parent: string) => {
-    return new Game({ ...config, parent });
+    return new PhaserGame({ ...config, parent });
 };
 
 export default StartGame;

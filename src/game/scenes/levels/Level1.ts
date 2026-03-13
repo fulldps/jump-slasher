@@ -1,11 +1,6 @@
-import { Scene } from "phaser";
-import { EventBus } from "../../EventBus";
+import { LevelBase } from "./LevelBase";
 
-export class Level1 extends Scene {
-    player: Phaser.Physics.Arcade.Sprite;
-    platforms: Phaser.Physics.Arcade.StaticGroup;
-    cursors: Phaser.Types.Input.Keyboard.CursorKeys;
-
+export class Level1 extends LevelBase {
     constructor() {
         super("Level1");
     }
@@ -14,24 +9,34 @@ export class Level1 extends Scene {
         // Фон
         this.add.image(512, 384, "background");
 
-        // == Platforms ==
+        // Платформы
         this.platforms = this.physics.add.staticGroup();
 
-        // Ground
-        this.platforms.create(512, 740, "ground").setScale(2, 1).refreshBody;
+        this.buildLevel(); // ← Выносим построение уровня в отдельный метод
 
-        // Platforms
-        this.platforms.create(300, 600, "platform");
+        // Игрок
+        this.setupPlayer(100, 600);
+
+        // Коллизии
+        this.physics.add.collider(this.player, this.platforms);
+
+        // Управление и анимации (из базового класса)
+        this.setupControls();
+        this.createAnimations();
+    }
+
+    protected buildLevel() {
+        // Земля
+        this.platform =
+            // Платформы
+            this.platforms.create(300, 600, "platform");
         this.platforms.create(700, 500, "platform");
         this.platforms.create(200, 400, "platform");
         this.platforms.create(600, 300, "platform");
+    }
 
-        // Player
-        this.player = this.physics.add.sprite(100, 600, "player");
-        this.player.setCollideWorldBounds(true);
-        this.player.setBounce(0.2);
-
-        // Collisions
-        this.physics.add.collider(this.player, this.platforms);
+    // Пример: переход на следующий уровень
+    goToNextLevel() {
+        this.scene.start("Level2");
     }
 }
