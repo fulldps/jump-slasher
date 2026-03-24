@@ -6,36 +6,41 @@ export class Level1 extends LevelBase {
     }
 
     create() {
-        // Фон
-        this.add.image(512, 384, "background");
+        // 1. Инициализация базы (подписка на resize и т.д.)
+        this.createBase();
 
-        // Платформы
-        this.platforms = this.physics.add.staticGroup();
+        // 2. Установка фона (адаптивный, с поддержкой смены)
+        // Второй параметр (1000) — время плавного появления в мс. Поставь 0, если нужно мгновенно.
+        this.setBackground("background", 1000);
 
-        this.buildLevel(); // ← Выносим построение уровня в отдельный метод
+        // 3. Загрузка тайлмапа
+        const map = this.make.tilemap({ key: "map" });
+        const tileset = map.addTilesetImage("tiles", "maintilemap", 24, 24);
 
-        // Игрок
-        this.setupPlayer(100, 600);
+        // Создаём слой "ground" (имя должно совпадать с тем, что в Tiled)
+        const groundLayer = map.createLayer("ground", tileset, 0, 0);
+        groundLayer?.setCollisionByExclusion([-1]); // -1 = пустые тайлы не коллизия
 
-        // Коллизии
-        this.physics.add.collider(this.player, this.platforms);
+        // 4. Игрок и физика
+        this.setupPlayer(100, 600); // Позиция старта из базового класса
 
-        // Управление и анимации (из базового класса)
+        if (groundLayer) {
+            this.physics.add.collider(this.player, groundLayer);
+        }
+
+        // 5. Управление и анимации
         this.setupControls();
         this.createAnimations();
+
+        // 6. Настройка камеры (следует за игроком)
+        this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+        this.cameras.main.setDeadzone(100, 100);
     }
 
     protected buildLevel() {
-        // Земля
-        // this.platform =
-        // Платформы
-        this.platforms.create(300, 600, "platform");
-        this.platforms.create(700, 500, "platform");
-        this.platforms.create(200, 400, "platform");
-        this.platforms.create(600, 300, "platform");
+        // Если нужно добавить специфичные для уровня объекты (не тайлмап), пиши сюда
     }
 
-    // Пример: переход на следующий уровень
     goToNextLevel() {
         this.scene.start("Level2");
     }

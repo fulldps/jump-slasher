@@ -1,0 +1,29 @@
+{
+    "activeFile": "",
+    "expandedProjectPaths": [
+    ],
+    "fileStates": {
+        "maintilemap.json#tiles": {
+            "scaleInEditor": 1
+        },
+        "tiles.tsj": {
+            "scaleInDock": 0.8845,
+            "scaleInEditor": 1
+        }
+    },
+    "last.imagePath": "/Users/nazarsinutin/Documents/progMac/web/2025/Vue/platform-vue-ts/public/assets",
+    "map.lastUsedFormat": "json",
+    "map.tileHeight": 24,
+    "map.tileWidth": 24,
+    "openFiles": [
+    ],
+    "project": "main-tiles.tiled-project",
+    "recentFiles": [
+        "tiles.tsj"
+    ],
+    "tileset.lastUsedFormat": "json",
+    "tileset.tileSize": {
+        "height": 24,
+        "width": 24
+    }
+}
