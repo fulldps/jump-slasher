@@ -14,9 +14,9 @@ export class Preloader extends Scene {
         this.load.image("background", "/background/background_layer_1.png");
 
         // Игрок
-        this.load.spritesheet("player", "characters.png", {
-            frameWidth: 32,
-            frameHeight: 32,
+        this.load.spritesheet("player", "character/char_blue.png", {
+            frameWidth: 56,
+            frameHeight: 56,
         });
 
         // ТАЙЛМАП

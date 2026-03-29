@@ -1,8 +1,9 @@
 import { Scene } from "phaser";
 import { EventBus } from "../EventBus";
+import { Player } from "../objects/Player";
 
 export class Game extends Scene {
-    player: Phaser.Physics.Arcade.Sprite;
+    player: Player;
     // enemy: Phaser.Physics.Arcade.Sprite;
     cursors: Phaser.Types.Input.Keyboard.CursorKeys;
 

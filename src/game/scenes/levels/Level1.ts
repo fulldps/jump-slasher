@@ -29,8 +29,6 @@ export class Level1 extends LevelBase {
         }
 
         // 5. Управление и анимации
-        this.setupControls();
-        this.createAnimations();
 
         // 6. Настройка камеры (следует за игроком)
         this.cameras.main.startFollow(this.player, true, 0.08, 0.08);

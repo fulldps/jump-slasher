@@ -1,9 +1,11 @@
 import { Scene } from "phaser";
+import { Player } from "../../objects/Player";
+import { InputManager } from "../../input/InputManager";
 
 export abstract class LevelBase extends Scene {
-    player: Phaser.Physics.Arcade.Sprite;
+    player: Player;
     platforms: Phaser.Physics.Arcade.StaticGroup;
-    cursors: Phaser.Types.Input.Keyboard.CursorKeys;
+    protected inputManager: InputManager;
 
     private currentBg?: Phaser.GameObjects.Image; // Текущий фон
 
@@ -16,22 +18,14 @@ export abstract class LevelBase extends Scene {
     protected createBase(): void {
         // Подписываемся на resize ОДИН раз при старте уровня
         this.scale.on("resize", this.handleResize, this);
-    }
-
-    shutdown(): void {
-        // Отписываемся при уходе со сцены (защита от утечек памяти)
-        this.scale.off("resize", this.handleResize, this);
-        this.currentBg?.destroy();
-        super.shutdown();
+        this.inputManager = new InputManager(this);
     }
 
     // === УПРАВЛЕНИЕ ФОНОМ ===
 
-    /**
-     * Устанавливает или меняет фон
-     * @param textureKey - ключ текстуры
-     * @param fade - длительность перехода в мс (0 = мгновенно)
-     */
+    // Устанавливает или меняет фон
+    // @param textureKey - ключ текстуры
+    // @param fade - длительность перехода в мс (0 = мгновенно)
     protected setBackground(textureKey: string, fade: number = 0): void {
         // Если фон уже есть и переход не нужен — просто меняем текстуру
         if (this.currentBg && fade === 0) {
@@ -73,75 +67,35 @@ export abstract class LevelBase extends Scene {
         this.currentBg = newBg;
     }
 
-    /** Обновляет размер фона при изменении окна */
+    // Обновляет размер фона при изменении окна
     private handleResize(gameSize: Phaser.Structs.Size): void {
         this.currentBg?.setDisplaySize(gameSize.width, gameSize.height);
     }
 
     // === ОБЩИЙ КОД ДЛЯ ВСЕХ УРОВНЕЙ ===
+    protected setupControls() {}
 
     protected setupPlayer(x: number, y: number) {
-        this.player = this.physics.add.sprite(x, y, "player");
-        this.player.setCollideWorldBounds(false);
-        this.player.setBounce(0.2);
-        this.player.setDepth(1);
-    }
-
-    protected setupControls() {
-        if (this.input.keyboard) {
-            this.cursors = this.input.keyboard.createCursorKeys();
-        }
-    }
-
-    protected createAnimations() {
-        this.anims.create({
-            key: "run",
-            frames: this.anims.generateFrameNames("player", {
-                start: 12,
-                end: 15,
-            }),
-            frameRate: 10,
-            repeat: -1,
-        });
-        this.anims.create({
-            key: "idle",
-            frames: [{ key: "player", frame: 1 }],
-            frameRate: 20,
-        });
-        this.anims.create({
-            key: "jump",
-            frames: [{ key: "player", frame: 4 }],
-            frameRate: 20,
-        });
-    }
-
-    protected handelPlayerMovements() {
-        if (!this.cursors || !this.player) return;
-
-        if (this.cursors.left.isDown) {
-            this.player.setVelocityX(-160);
-            this.player.anims.play("run", true);
-            this.player.setFlipX(true);
-        } else if (this.cursors.right.isDown) {
-            this.player.setVelocityX(160);
-            this.player.anims.play("run", true);
-            this.player.setFlipX(false);
-        } else if (this.cursors.up.isDown) {
-            this.player.setVelocityY(-350);
-        } else {
-            this.player.setVelocityX(0);
-            this.player.anims.play("idle", true);
-        }
-        if (this.cursors.up.isDown && this.player.body?.blocked.down) {
-            this.player.setVelocityY(-350);
-        }
+        this.player = new Player(this, x, y);
+        this.player.setScale(2).refreshBody();
+        this.setupControls();
     }
 
     // === АБСТРАКТНЫЕ МЕТОДЫ ===
-
-    protected abstract buildLevel(): void;
+    // protected abstract buildLevel(): void {}
 
     update() {
-        this.handelPlayerMovements();
+        if (this.player && this.inputManager) {
+            const direction = this.inputManager.getDirection();
+            this.player.processInput(direction);
+        }
+    }
+
+    shutdown(): void {
+        // Отписываемся при уходе со сцены (защита от утечек памяти)
+        this.scale.off("resize", this.handleResize, this);
+        this.currentBg?.destroy();
+        this.inputManager.destroy();
+        super.shutdown();
     }
 }
