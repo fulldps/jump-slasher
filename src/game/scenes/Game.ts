@@ -17,7 +17,7 @@ export class Game extends Scene {
 
     create() {
         console.log("Game.create() — ассеты готовы, запускаем Level1");
-        this.scene.start("Level1");
+        this.scene.start("WorldScene");
         EventBus.emit("current-scene-ready", this);
     }
 }
