@@ -8,10 +8,11 @@ export class Preloader extends Scene {
     preload() {
         this.load.setPath("assets");
 
-        console.log("🔄 Загрузка ассетов...");
-
         // Фон
-        this.load.image("background", "/background/background_layer_1.png");
+        this.load.image("bg_1", "background/bg_1.png");
+        this.load.image("bg_2", "background/bg_2.png");
+        this.load.image("bg_3", "background/bg_3.png");
+        this.load.image("bg_4", "background/bg_4.png");
 
         // Игрок
         this.load.spritesheet("player", "character/char_blue.png", {
@@ -21,8 +22,9 @@ export class Preloader extends Scene {
 
         // ТАЙЛМАП
         console.log("🔄 Загрузка тайлмапа...");
-        this.load.image("maintilemap", "main-tilemap.png");
-        this.load.tilemapTiledJSON("map", "maintilemap.json");
+
+        this.load.image("maintilemap", "terra-tilemap.png");
+        this.load.tilemapTiledJSON("map", "terramap.json");
 
         // Отслеживаем прогресс
         this.load.on("progress", (value: number) => {
@@ -30,15 +32,25 @@ export class Preloader extends Scene {
         });
 
         this.load.on("complete", () => {
-            console.log("✅ Все ассеты загружены!");
+            console.log("Все ассеты загружены!");
         });
 
         this.load.on("error", (file: any) => {
-            console.error("❌ Ошибка загрузки:", file.src);
+            console.error("Ошибка загрузки:", file.src);
         });
     }
 
     create() {
+        if (!this.cache.tilemap.exists("map")) {
+            console.error("No tilemap in cache");
+            return;
+        }
+
+        if (!this.textures.exists("maintilemap")) {
+            console.error("No texture in cache");
+            return;
+        }
+
         console.log("🎮 Preloader завершен, переход на Game...");
         this.scene.start("Game");
     }

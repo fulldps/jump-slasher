@@ -1,19 +1,23 @@
 import { Scene } from "phaser";
 import { EventBus } from "../EventBus";
-import { Player } from "../objects/Player";
 
 export class Game extends Scene {
-    player: Player;
-    // enemy: Phaser.Physics.Arcade.Sprite;
-    cursors: Phaser.Types.Input.Keyboard.CursorKeys;
-
     constructor() {
         super("Game");
     }
 
-    create() {
-        this.scene.start("Level1");
+    init() {
+        // Проверка: если тайлмап не в кэше — запускаем Preloader
+        if (!this.cache.tilemap.exists("map")) {
+            console.warn("Ассеты не загружены, запускаем Preloader...");
+            this.scene.start("Preloader");
+            return;
+        }
+    }
 
+    create() {
+        console.log("Game.create() — ассеты готовы, запускаем Level1");
+        this.scene.start("Level1");
         EventBus.emit("current-scene-ready", this);
     }
 }

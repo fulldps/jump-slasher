@@ -7,7 +7,7 @@ export abstract class LevelBase extends Scene {
     platforms: Phaser.Physics.Arcade.StaticGroup;
     protected inputManager: InputManager;
 
-    private currentBg?: Phaser.GameObjects.Image; // Текущий фон
+    private parallaxLayers: Phaser.GameObjects.TileSprite[] = []; // Текущий фон
 
     constructor(key: string) {
         super(key);
@@ -16,60 +16,30 @@ export abstract class LevelBase extends Scene {
     // === ЖИЗНЕННЫЙ ЦИКЛ ===
 
     protected createBase(): void {
-        // Подписываемся на resize ОДИН раз при старте уровня
-        this.scale.on("resize", this.handleResize, this);
         this.inputManager = new InputManager(this);
     }
 
-    // === УПРАВЛЕНИЕ ФОНОМ ===
+    // === PARALLAX BACKGROUND  ===
 
-    // Устанавливает или меняет фон
-    // @param textureKey - ключ текстуры
-    // @param fade - длительность перехода в мс (0 = мгновенно)
-    protected setBackground(textureKey: string, fade: number = 0): void {
-        // Если фон уже есть и переход не нужен — просто меняем текстуру
-        if (this.currentBg && fade === 0) {
-            this.currentBg.setTexture(textureKey);
-            return;
-        }
+    protected setParallaxBackground(layerKeys: string[]): void {
+        const scrollFactors = [0.0, 0.2, 0.5, 0.8];
 
-        // Создаём новый фон
-        const newBg = this.add.image(0, 0, textureKey);
-        newBg.setOrigin(0, 0);
-        newBg.setDisplaySize(this.scale.width, this.scale.height);
-        newBg.setScrollFactor(0); // Фон не двигается за камерой
-        newBg.setDepth(-10); // Всегда позади всего
+        layerKeys.forEach((key, index) => {
+            const layer = this.add.tileSprite(
+                0,
+                0,
+                this.scale.width,
+                this.scale.height,
+                key,
+            );
+            layer.setOrigin(0, 0);
+            layer.setScrollFactor(0);
+            layer.setDepth(-10 + index);
 
-        // Логика перехода
-        if (this.currentBg && fade > 0) {
-            // Плавная смена (Cross-fade)
-            newBg.setAlpha(0);
+            layer.setData("parallaxSpeed", scrollFactors[index] || 0);
 
-            this.tweens.add({
-                targets: newBg,
-                alpha: 1,
-                duration: fade,
-                ease: "Linear",
-            });
-
-            this.tweens.add({
-                targets: this.currentBg,
-                alpha: 0,
-                duration: fade,
-                ease: "Linear",
-                onComplete: () => this.currentBg?.destroy(),
-            });
-        } else if (this.currentBg) {
-            // Мгновенная замена
-            this.currentBg.destroy();
-        }
-
-        this.currentBg = newBg;
-    }
-
-    // Обновляет размер фона при изменении окна
-    private handleResize(gameSize: Phaser.Structs.Size): void {
-        this.currentBg?.setDisplaySize(gameSize.width, gameSize.height);
+            this.parallaxLayers.push(layer);
+        });
     }
 
     // === ОБЩИЙ КОД ДЛЯ ВСЕХ УРОВНЕЙ ===
@@ -77,7 +47,6 @@ export abstract class LevelBase extends Scene {
 
     protected setupPlayer(x: number, y: number) {
         this.player = new Player(this, x, y);
-        this.player.setScale(2).refreshBody();
         this.setupControls();
     }
 
@@ -89,13 +58,21 @@ export abstract class LevelBase extends Scene {
             const direction = this.inputManager.getDirection();
             this.player.processInput(direction);
         }
+
+        if (this.cameras.main) {
+            this.parallaxLayers.forEach((layer, index) => {
+                const speed = [0.0, 0.2, 0.5, 0.8][index] || 0;
+                layer.tilePositionX = this.cameras.main.scrollX * speed;
+            });
+        }
     }
 
     shutdown(): void {
-        // Отписываемся при уходе со сцены (защита от утечек памяти)
-        this.scale.off("resize", this.handleResize, this);
-        this.currentBg?.destroy();
-        this.inputManager.destroy();
+        this.parallaxLayers.forEach((layer) => {
+            layer.destroy();
+        });
+        this.parallaxLayers = [];
+        this.inputManager?.destroy();
         super.shutdown();
     }
 }

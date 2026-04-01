@@ -8,31 +8,70 @@ export class Level1 extends LevelBase {
     create() {
         // 1. Инициализация базы (подписка на resize и т.д.)
         this.createBase();
+        this.physics.world.createDebugGraphic();
 
         // 2. Установка фона (адаптивный, с поддержкой смены)
         // Второй параметр (1000) — время плавного появления в мс. Поставь 0, если нужно мгновенно.
-        this.setBackground("background", 1000);
+        this.setParallaxBackground(["bg_1", "bg_2", "bg_3", "bg_4"]);
 
         // 3. Загрузка тайлмапа
         const map = this.make.tilemap({ key: "map" });
-        const tileset = map.addTilesetImage("tiles", "maintilemap", 24, 24);
+        if (!map) {
+            console.error("Map not created");
+            return;
+        }
+
+        const tileset = map.addTilesetImage(
+            "terra-tilemap-basic",
+            "maintilemap",
+            16,
+            16,
+        );
+        if (!tileset) {
+            console.error("Tileset not created");
+            console.log(map.tilesets);
+            return;
+        }
 
         // Создаём слой "ground" (имя должно совпадать с тем, что в Tiled)
         const groundLayer = map.createLayer("ground", tileset, 0, 0);
-        groundLayer?.setCollisionByExclusion([-1]); // -1 = пустые тайлы не коллизия
+        groundLayer?.setCollisionByExclusion([-1], true); // -1 = пустые тайлы не коллизия
+
+        if (!groundLayer) {
+            console.error("groundLayer not created");
+            console.log(map.layers.map((l) => l.name));
+        }
+        // const debugGraphics = this.add.graphics();
+        // groundLayer.renderDebug(debugGraphics, {
+        //     tileColor: null,
+        //     collidingTileColor: new Phaser.Display.Color(243, 134, 48, 255), // Оранжевые = коллизия
+        //     faceColor: new Phaser.Display.Color(40, 34, 197, 255), // Синие = границы
+        // });
 
         // 4. Игрок и физика
-        this.setupPlayer(100, 600); // Позиция старта из базового класса
+        this.setupPlayer(100, 300); // Позиция старта из базового класса
 
         if (groundLayer) {
-            this.physics.add.collider(this.player, groundLayer);
+            this.physics.add.collider(this.player, groundLayer, () => {});
         }
 
-        // 5. Управление и анимации
+        // 5. Настройка камеры (следует за игроком)
+        this.physics.world.setBounds(
+            0,
+            0,
+            map.widthInPixels,
+            map.heightInPixels,
+        );
+        this.cameras.main.setBounds(
+            0,
+            0,
+            map.widthInPixels,
+            map.heightInPixels,
+        );
 
-        // 6. Настройка камеры (следует за игроком)
-        this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
-        this.cameras.main.setDeadzone(100, 100);
+        // this.cameras.main.setZoom(2);
+        this.cameras.main.setRoundPixels(true);
+        this.cameras.main.startFollow(this.player, true, 0.2, 0.3);
     }
 
     protected buildLevel() {
@@ -41,5 +80,12 @@ export class Level1 extends LevelBase {
 
     goToNextLevel() {
         this.scene.start("Level2");
+    }
+    update(): void {
+        super.update();
+        if (this.player && this.inputManager) {
+            const direction = this.inputManager.getDirection();
+            this.player.processInput(direction);
+        }
     }
 }

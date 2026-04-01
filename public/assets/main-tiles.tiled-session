@@ -1,29 +1,81 @@
 {
-    "activeFile": "",
+    "activeFile": "maintilemap.json",
     "expandedProjectPaths": [
     ],
     "fileStates": {
+        "": {
+            "scaleInDock": 1
+        },
+        "infinite-tilemap.json": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1.0643
+        },
+        "maintilemap.json": {
+            "scale": 0.7687,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 239.3651619617536,
+                "y": 381.8134512813841
+            }
+        },
         "maintilemap.json#tiles": {
+            "scaleInDock": 1.0848,
+            "scaleInEditor": 1
+        },
+        "terra-tile.tsj": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
+        "terramap.json": {
+            "scale": 0.834,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 523.9808153477219,
+                "y": 1179.2565947242208
+            }
+        },
+        "terramap.json#terra-tilemap-basic": {
+            "scaleInEditor": 1
+        },
+        "terramap.tsj": {
+            "scaleInDock": 1,
             "scaleInEditor": 1
         },
         "tiles.tsj": {
             "scaleInDock": 0.8845,
             "scaleInEditor": 1
+        },
+        "tiles_terra.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 2.2465
         }
     },
+    "last.exportedFilePath": "/Users/nazarsinutin/Documents/progMac/web/2025/Vue/platform-vue-ts/public/assets",
     "last.imagePath": "/Users/nazarsinutin/Documents/progMac/web/2025/Vue/platform-vue-ts/public/assets",
+    "map.height": 90,
+    "map.lastUsedExportFilter": "All Files (*)",
     "map.lastUsedFormat": "json",
-    "map.tileHeight": 24,
-    "map.tileWidth": 24,
+    "map.tileHeight": 16,
+    "map.tileWidth": 16,
+    "map.width": 160,
     "openFiles": [
+        "maintilemap.json"
     ],
     "project": "main-tiles.tiled-project",
     "recentFiles": [
+        "maintilemap.json",
+        "terramap.tsj",
+        "terramap.json",
+        "terra-tile.tsj",
+        "tiles_terra.tsx",
+        "infinite-tilemap.json",
         "tiles.tsj"
     ],
+    "tileset.embedInMap": true,
+    "tileset.lastUsedExportFilter": "JSON tileset files (*.tsj *.json)",
     "tileset.lastUsedFormat": "json",
     "tileset.tileSize": {
-        "height": 24,
-        "width": 24
+        "height": 16,
+        "width": 16
     }
 }
