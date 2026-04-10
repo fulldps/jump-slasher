@@ -34,7 +34,7 @@ export class InputManager {
             x: x,
             y: y,
             jump: this.keys?.up.isDown ?? false,
-            attack: this.keys?.attack.isDown ?? false,
+            attack: this.keys?.attack.JustDown ?? false,
             block: this.keys?.block.isDown ?? false,
         };
     }
@@ -47,4 +47,3 @@ export class InputManager {
         }
     }
 }
-

@@ -63,7 +63,7 @@ export class WorldScene extends WorldSceneBase {
             map.heightInPixels,
         );
 
-        // this.cameras.main.setZoom(2);
+        this.cameras.main.setZoom(1.8);
         this.cameras.main.setRoundPixels(true);
         this.cameras.main.startFollow(this.player, true, 0.2, 0.3);
     }

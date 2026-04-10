@@ -1,8 +1,23 @@
-type PlayerState = "idle" | "run" | "jump" | "attack" | "block";
+type PlayerState =
+    | "idle"
+    | "run"
+    | "jump"
+    | "attack"
+    | "block"
+    | "fall"
+    | "hurt"
+    | "dead";
+
+const forbidden = {
+    fall: ["jump"],
+    attack: ["run"],
+    hurt: ["run", "jump", "attack"],
+    dead: ["idle", "run", "fall", "jump", "attack", "block", "hurt"],
+};
 
 export class Player extends Phaser.Physics.Arcade.Sprite {
     private speed: number = 120;
-    private jumpForce: number = -460;
+    private jumpForce: number = -260;
     private attackDamage: number = 20;
     private attackDuration: number = 200;
     private attackCooldownTime: number = 500;
@@ -40,6 +55,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
                 repeat: -1,
             });
         }
+
         if (!this.anims.exists("idle")) {
             this.anims.create({
                 key: "idle",
@@ -51,6 +67,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
                 repeat: -1,
             });
         }
+
         if (!this.anims.exists("jump")) {
             this.anims.create({
                 key: "jump",
@@ -62,9 +79,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
                 repeat: 0,
             });
         }
+
         if (!this.anims.exists("block")) {
             this.anims.create({
                 key: "block",
+                frames: [{ key: "player", frame: 9 }],
+                frameRate: 1,
+                repeat: -1,
             });
         }
 
@@ -81,6 +102,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         }
     }
 
+    public setState(newState: PlayerState): void {
+        if (this.state === newState) {
+            return;
+        }
+        if (forbidden[newState] && forbidden[newState].includes(this.state)) {
+            return;
+        }
+
+        this.state = newState;
+        this.anims.play(newState, true);
+    }
+
     public processInput(direction: {
         x: number;
         y: number;
@@ -88,72 +121,43 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         attack: boolean;
         block: boolean;
     }): void {
-        if (direction.block && !this.isAttacking) {
-            this.startBlock();
-        } else {
-            this.stopBlock();
-
-            if (!this.isAttacking) {
-                this.handleMovement(direction);
-            }
-
-            if (direction.attack && this.canAttack) {
-                this.startAttack();
-            }
-        }
-
-        if (this.isAttacking) {
+        if (direction.attack) {
             this.handleAttack(direction);
-        }
-    }
-
-    private startAttack() {}
-    private stopAttack() {}
-    private startBlock() {}
-    private stopBlock() {}
-
-    private handleMovement(direction: { x: number; y: number; jump: boolean }) {
-        // horizontal movement
-        if (direction.x === -1) {
-            this.setVelocityX(-this.speed);
-            if (this.body?.blocked.down) {
-                this.anims.play("run", true);
-            }
-            this.setFlipX(true);
-        } else if (direction.x === 1) {
-            this.setVelocityX(this.speed);
-            if (this.body?.blocked.down) {
-                this.anims.play("run", true);
-            }
-            this.setFlipX(false);
-        } else {
-            this.setVelocityX(0);
-        }
-
-        // jump
-        if (direction.jump && this.body?.blocked.down && this.canJump) {
+        } else if (direction.jump && this.body?.blocked.down) {
+            this.setState("jump");
             this.setVelocityY(this.jumpForce);
-            this.anims.play("jump", true);
-            this.canJump = false;
-            return;
-        }
-
-        if (!this.body?.blocked.down) {
-            this.canJump = false;
-            this.anims.play("jump", true);
-        } else {
-            this.canJump = true;
-            if (direction.x !== 0) {
-                this.anims.play("run", true);
+        } else if (direction.x !== 0) {
+            this.setState("run");
+            if (direction.x < 0) {
+                this.setVelocityX(-this.speed);
+                this.setFlipX(true);
             } else {
-                this.anims.play("idle", true);
+                this.setVelocityX(this.speed);
+                this.setFlipX(false);
             }
+        } else if (this.body?.blocked.down) {
+            this.setState("idle");
+            this.setVelocityX(0);
         }
     }
 
     private handleAttack(direction: { attack: boolean }) {
         if (direction.attack) {
+            this.setState("attack");
+            console.log("attack");
+            this.setVelocityX(0);
             this.anims.play("attack", true);
         }
     }
+
+    private handleBlock(direction: { block: boolean }) {
+        if (direction.block) {
+            this.setState("block");
+            console.log("block");
+            this.setVelocityX(0);
+            this.anims.play("block", true);
+        }
+    }
+
+    private handleDead(direction: { dead: boolean }) {}
 }

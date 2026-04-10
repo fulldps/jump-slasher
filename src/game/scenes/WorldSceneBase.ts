@@ -57,6 +57,7 @@ export abstract class WorldSceneBase extends Scene {
         if (this.player && this.inputManager) {
             const direction = this.inputManager.getDirection();
             this.player.processInput(direction);
+            // this.player.update(time, delta);
         }
 
         if (this.cameras.main) {
