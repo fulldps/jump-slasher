@@ -53,11 +53,11 @@ export abstract class WorldSceneBase extends Scene {
     // === АБСТРАКТНЫЕ МЕТОДЫ ===
     // protected abstract buildLevel(): void {}
 
-    update() {
+    update(time: number, delta: number) {
         if (this.player && this.inputManager) {
             const direction = this.inputManager.getDirection();
             this.player.processInput(direction);
-            // this.player.update(time, delta);
+            this.player.update(time, delta);
         }
 
         if (this.cameras.main) {

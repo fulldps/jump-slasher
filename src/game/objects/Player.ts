@@ -18,6 +18,8 @@ const forbidden = {
 export class Player extends Phaser.Physics.Arcade.Sprite {
     private speed: number = 120;
     private jumpForce: number = -260;
+    private attackTimer: number = 0;
+    private canAttack: boolean = true;
     private attackDamage: number = 20;
     private attackDuration: number = 200;
     private attackCooldownTime: number = 500;
@@ -121,43 +123,85 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         attack: boolean;
         block: boolean;
     }): void {
-        if (direction.attack) {
-            this.handleAttack(direction);
-        } else if (direction.jump && this.body?.blocked.down) {
-            this.setState("jump");
-            this.setVelocityY(this.jumpForce);
-        } else if (direction.x !== 0) {
-            this.setState("run");
-            if (direction.x < 0) {
-                this.setVelocityX(-this.speed);
-                this.setFlipX(true);
+        if (
+            this.state === "attack" ||
+            this.state === "hurt" ||
+            this.state === "dead"
+        ) {
+            return;
+        } else {
+            if (direction.attack && this.canAttack) this.startAttack();
+            else if (direction.jump && this.body?.blocked.down)
+                this.handleJump();
+            else if (direction.x !== 0) this.setState("run")
+                this.handleJump();
+            else if (direction.jump && this.body?.blocked.down)
+                this.handleJump();
+        }
+    }
+
+//TODO handleRun()
+    //
+    private startAttack() {
+        this.setState("attack");
+        this.setVelocityX(0);
+        this.attackTimer = 0;
+        this.canAttack = false;
+    }
+
+    private handleAttack() {
+        this.setState("attack");
+        console.log("attack");
+        this.setVelocityX(0);
+        this.anims.play("attack", true);
+    }
+
+    private handleBlock() {
+        this.setState("block");
+        console.log("block");
+        this.setVelocityX(0);
+        this.anims.play("block", true);
+    }
+
+    private handleJump(): void {
+        if ((this.body as Phaser.Physics.Arcade.Body).velocity.y > 0) {
+            this.setState("fall");
+        }
+    }
+
+    private handleFall(): void {
+        if (this.body?.blocked.down) {
+            if ((this.body as Phaser.Physics.Arcade.Body).velocity.x !== 0) {
+                this.setState("run");
             } else {
-                this.setVelocityX(this.speed);
-                this.setFlipX(false);
+                this.setState("idle");
             }
-        } else if (this.body?.blocked.down) {
-            this.setState("idle");
-            this.setVelocityX(0);
         }
     }
 
-    private handleAttack(direction: { attack: boolean }) {
-        if (direction.attack) {
-            this.setState("attack");
-            console.log("attack");
-            this.setVelocityX(0);
-            this.anims.play("attack", true);
+    private handleHurt(): void {}
+
+    private handleDead() {}
+    public update(delta: number) {
+        switch (this.state) {
+            case "jump":
+                this.handleJump();
+                break;
+            case "attack":
+                this.handleAttack(delta);
+                break;
+            case "dead":
+                this.handleDead();
+                break;
+            case "block":
+                this.handleBlock();
+                break;
+            case "hurt":
+                this.handleHurt(delta);
+                break;
+            case "fall":
+                this.handleFall();
+                break;
         }
     }
-
-    private handleBlock(direction: { block: boolean }) {
-        if (direction.block) {
-            this.setState("block");
-            console.log("block");
-            this.setVelocityX(0);
-            this.anims.play("block", true);
-        }
-    }
-
-    private handleDead(direction: { dead: boolean }) {}
 }
