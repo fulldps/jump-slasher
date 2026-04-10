@@ -18,9 +18,11 @@ const forbidden = {
 export class Player extends Phaser.Physics.Arcade.Sprite {
     private speed: number = 120;
     private jumpForce: number = -260;
+    private attackTimer: number = 0;
     private attackDamage: number = 20;
     private attackDuration: number = 200;
     private attackCooldownTime: number = 500;
+    private canAttack: boolean = true;
 
     private state: PlayerState = "idle";
 
@@ -122,7 +124,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         block: boolean;
     }): void {
         if (direction.attack) {
-            this.handleAttack(direction);
+            this.setState("attack");
+            this.handleAttack(direction)
         } else if (direction.jump && this.body?.blocked.down) {
             this.setState("jump");
             this.setVelocityY(this.jumpForce);
@@ -159,5 +162,37 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         }
     }
 
+    private handleJump(): void {
+        if((this.body as Phaser.Physics.Arcade.Body).velocity.y > 0) {
+            this.setState('fall');
+        }
+    }
+
+    private handleFall(): void {
+        if (this.body?.blocked.down) {
+            if((this.body as Phaser.Physics.Arcade.Body).velocity.x !== 0 ) {
+                this.setState("run")
+            } else {
+                this.setState("idle")
+            }
+        }
+    }
+
     private handleDead(direction: { dead: boolean }) {}
+
+
+    public update(delta: number): void {
+        switch (this.state) {
+            case "jump": this.handleJump(); break;
+            case "fall": this.handleFall(); break;
+            case "attack": this.handleAttack(delta); break;
+            case "hurt": this.handleHurt(delta); break;
+            case "dead": this.handleDead(); break;
+                
+        
+            default:
+                break;
+        }
+
+    }
 }

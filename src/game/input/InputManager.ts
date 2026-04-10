@@ -34,7 +34,7 @@ export class InputManager {
             x: x,
             y: y,
             jump: this.keys?.up.isDown ?? false,
-            attack: this.keys?.attack.JustDown ?? false,
+            attack: Phaser.Input.Keyboard.JustDown(this.keys?.attack) ?? false,
             block: this.keys?.block.isDown ?? false,
         };
     }
