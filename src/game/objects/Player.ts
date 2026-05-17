@@ -8,7 +8,7 @@ type PlayerState =
     | "hurt"
     | "dead";
 
-const forbidden = {
+const forbidden: Partial<Record<PlayerState, PlayerState[]>> = {
     fall: ["jump"],
     attack: ["run"],
     hurt: ["run", "jump", "attack"],
@@ -19,20 +19,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     private speed: number = 120;
     private jumpForce: number = -260;
     private attackTimer: number = 0;
+    private canAttack: boolean = true;
     private attackDamage: number = 20;
     private attackDuration: number = 200;
     private attackCooldownTime: number = 500;
-    private canAttack: boolean = true;
 
     private state: PlayerState = "idle";
-
-    private attackHitbox?: Phaser.Physics.Arcade.Rectangle;
 
     constructor(scene: Phaser.Scene, x: number, y: number) {
         super(scene, x, y, "player");
 
         scene.physics.world.enable(this);
-        this.body?.setSize(26, 40); // 3. Настраиваем хитбокс
+        this.body?.setSize(26, 40);
         this.body?.setOffset(15, 16);
         scene.add.existing(this);
 
@@ -46,40 +44,31 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     public createAnimations() {
-        if (!this.anims.exists("run")) {
-            this.anims.create({
-                key: "run",
-                frames: this.anims.generateFrameNumbers("player", {
-                    start: 16,
-                    end: 23,
-                }),
-                frameRate: 10,
-                repeat: -1,
-            });
-        }
+        const anims: {
+            key: string;
+            start: number;
+            end: number;
+            frameRate: number;
+            repeat: number;
+        }[] = [
+            { key: "run", start: 16, end: 23, frameRate: 10, repeat: -1 },
+            { key: "idle", start: 0, end: 5, frameRate: 7, repeat: -1 },
+            { key: "jump", start: 24, end: 31, frameRate: 10, repeat: 0 },
+            { key: "attack", start: 8, end: 13, frameRate: 10, repeat: -1 },
+        ];
 
-        if (!this.anims.exists("idle")) {
-            this.anims.create({
-                key: "idle",
-                frames: this.anims.generateFrameNumbers("player", {
-                    start: 0,
-                    end: 5,
-                }),
-                frameRate: 7,
-                repeat: -1,
-            });
-        }
-
-        if (!this.anims.exists("jump")) {
-            this.anims.create({
-                key: "jump",
-                frames: this.anims.generateFrameNumbers("player", {
-                    start: 24,
-                    end: 31,
-                }),
-                frameRate: 10,
-                repeat: 0,
-            });
+        for (const anim of anims) {
+            if (!this.anims.exists(anim.key)) {
+                this.anims.create({
+                    key: anim.key,
+                    frames: this.anims.generateFrameNumbers("player", {
+                        start: anim.start,
+                        end: anim.end,
+                    }),
+                    frameRate: anim.frameRate,
+                    repeat: anim.repeat,
+                });
+            }
         }
 
         if (!this.anims.exists("block")) {
@@ -90,27 +79,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
                 repeat: -1,
             });
         }
-
-        if (!this.anims.exists("attack")) {
-            this.anims.create({
-                key: "attack",
-                frames: this.anims.generateFrameNumbers("player", {
-                    start: 8,
-                    end: 13,
-                }),
-                frameRate: 10,
-                repeat: -1,
-            });
-        }
     }
 
     public setState(newState: PlayerState): void {
-        if (this.state === newState) {
-            return;
-        }
-        if (forbidden[newState] && forbidden[newState].includes(this.state)) {
-            return;
-        }
+        if (this.state === newState) return;
+        if (forbidden[newState]?.includes(this.state)) return;
 
         this.state = newState;
         this.anims.play(newState, true);
@@ -123,76 +96,81 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         attack: boolean;
         block: boolean;
     }): void {
-        if (direction.attack) {
-            this.setState("attack");
-            this.handleAttack(direction)
+        if (
+            this.state === "attack" ||
+            this.state === "hurt" ||
+            this.state === "dead"
+        )
+            return;
+
+        if (direction.attack && this.canAttack) {
+            this.startAttack();
+        } else if (direction.block) {
+            this.handleBlock();
         } else if (direction.jump && this.body?.blocked.down) {
             this.setState("jump");
             this.setVelocityY(this.jumpForce);
         } else if (direction.x !== 0) {
             this.setState("run");
-            if (direction.x < 0) {
-                this.setVelocityX(-this.speed);
-                this.setFlipX(true);
-            } else {
-                this.setVelocityX(this.speed);
-                this.setFlipX(false);
+            this.setVelocityX(direction.x * this.speed);
+            this.setFlipX(direction.x < 0);
+        } else {
+            this.setVelocityX(0);
+            if (this.body?.blocked.down) {
+                this.setState("idle");
             }
-        } else if (this.body?.blocked.down) {
-            this.setState("idle");
-            this.setVelocityX(0);
         }
     }
 
-    private handleAttack(direction: { attack: boolean }) {
-        if (direction.attack) {
-            this.setState("attack");
-            console.log("attack");
-            this.setVelocityX(0);
-            this.anims.play("attack", true);
-        }
+    private startAttack(): void {
+        this.setState("attack");
+        this.setVelocityX(0);
+        this.attackTimer = 0;
+        this.canAttack = false;
     }
 
-    private handleBlock(direction: { block: boolean }) {
-        if (direction.block) {
-            this.setState("block");
-            console.log("block");
-            this.setVelocityX(0);
-            this.anims.play("block", true);
-        }
+    private handleBlock(): void {
+        this.setState("block");
+        this.setVelocityX(0);
     }
 
     private handleJump(): void {
-        if((this.body as Phaser.Physics.Arcade.Body).velocity.y > 0) {
-            this.setState('fall');
+        if ((this.body as Phaser.Physics.Arcade.Body).velocity.y > 0) {
+            this.setState("fall");
         }
     }
 
     private handleFall(): void {
         if (this.body?.blocked.down) {
-            if((this.body as Phaser.Physics.Arcade.Body).velocity.x !== 0 ) {
-                this.setState("run")
-            } else {
-                this.setState("idle")
-            }
+            const vx = (this.body as Phaser.Physics.Arcade.Body).velocity.x;
+            this.setState(vx !== 0 ? "run" : "idle");
         }
     }
 
-    private handleDead(direction: { dead: boolean }) {}
+    private handleAttackUpdate(delta: number): void {
+        this.attackTimer += delta;
 
+        if (this.attackTimer >= this.attackDuration) {
+            this.setState("idle");
+
+            // cooldown ��। ᫥���饩 �⠪��
+            this.scene.time.delayedCall(this.attackCooldownTime, () => {
+                this.canAttack = true;
+            });
+        }
+    }
 
     public update(delta: number): void {
         switch (this.state) {
-            case "jump": this.handleJump(); break;
-            case "fall": this.handleFall(); break;
-            case "attack": this.handleAttack(delta); break;
-            case "hurt": this.handleHurt(delta); break;
-            case "dead": this.handleDead(); break;
-                
-        
-            default:
+            case "jump":
+                this.handleJump();
+                break;
+            case "attack":
+                this.handleAttackUpdate(delta);
+                break;
+            case "fall":
+                this.handleFall();
                 break;
         }
-
     }
 }
