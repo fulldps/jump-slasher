@@ -133,14 +133,17 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
             if (direction.attack && this.canAttack) this.startAttack();
             else if (direction.jump && this.body?.blocked.down)
                 this.handleJump();
-            else if (direction.x !== 0) this.setState("run")
+            else if (direction.x !== 0) {
+                this.setState("run");
                 this.handleJump();
-            else if (direction.jump && this.body?.blocked.down)
+            } else if (direction.jump && this.body?.blocked.down) {
+                this.setState("jump");
                 this.handleJump();
+            }
         }
     }
 
-//TODO handleRun()
+    //TODO handleRun()
     //
     private startAttack() {
         this.setState("attack");
