@@ -135,7 +135,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
                 this.handleJump();
             else if (direction.x !== 0) {
                 this.setState("run");
-                this.handleJump();
+                this.handleRun(direction.x);
+            } else if (this.body?.blocked.down) {
+                this.setState("idle");
+                this.setVelocityX(0);
             } else if (direction.jump && this.body?.blocked.down) {
                 this.setState("jump");
                 this.handleJump();
@@ -144,6 +147,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     //TODO handleRun()
+    private handleRun(x: number) {
+        this.setVelocityX(x * this.speed);
+        this.setFlipX(x < 0);
+    }
     //
     private startAttack() {
         this.setState("attack");
@@ -166,7 +173,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         this.anims.play("block", true);
     }
 
-    private handleJump(): void {
+    private handleJump() {
+        this.setVelocityY(this.jumpForce);
         if ((this.body as Phaser.Physics.Arcade.Body).velocity.y > 0) {
             this.setState("fall");
         }
@@ -191,7 +199,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
                 this.handleJump();
                 break;
             case "attack":
-                this.handleAttack(delta);
+                this.handleAttack();
                 break;
             case "dead":
                 this.handleDead();
@@ -200,7 +208,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
                 this.handleBlock();
                 break;
             case "hurt":
-                this.handleHurt(delta);
+                this.handleHurt();
                 break;
             case "fall":
                 this.handleFall();
