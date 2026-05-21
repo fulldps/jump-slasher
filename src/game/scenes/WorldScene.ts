@@ -1,8 +1,21 @@
 import { WorldSceneBase } from "./WorldSceneBase";
+import socket from "../../utils/socket";
 
 export class WorldScene extends WorldSceneBase {
     constructor() {
         super("WorldScene");
+    }
+
+    otherPlayers = [];
+
+    private addOtherPlayer(player) {
+        const otherPlayer = new Player(
+            this,
+            player.x,
+            player.y,
+            SPRITES.PLAYER,
+        );
+        this.otherPlayers[player.id] = otherPlayer;
     }
 
     create() {
@@ -66,6 +79,18 @@ export class WorldScene extends WorldSceneBase {
         this.cameras.main.setZoom(1.8);
         this.cameras.main.setRoundPixels(true);
         this.cameras.main.startFollow(this.player, true, 0.2, 0.3);
+
+        socket.emit("playerJoin", {
+            x: this.player.x,
+            y: this.player.y,
+            name: "hero",
+        });
+
+        socket.on("playerJoined", (data) => {
+            if (data.id !== socket.id) {
+                this.addOtherPlayer(data);
+            }
+        });
     }
 
     update(): void {

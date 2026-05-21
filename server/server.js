@@ -10,14 +10,23 @@ app.use(cors());
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
-        origin: "http://localhost:5173",
+        origin: "http://localhost:8080",
         methods: ["GET", "POST"],
     },
 });
 
+const players = new Map();
+
 io.on("connection", (socket) => {
     console.log("Player connected:", socket.id);
 
+    socket.on("playerJoin", (data) => {
+        players.set(socket.id, { ...data, id: socket.id });
+        socket.broadcast.emit("playerJoin", {
+            ...data,
+            id: socket.id,
+        });
+    });
     socket.on("disconnect", () => {
         console.log("Player disconnected:", socket.id);
     });

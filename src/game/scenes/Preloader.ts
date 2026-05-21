@@ -52,6 +52,6 @@ export class Preloader extends Scene {
         }
 
         console.log("🎮 Preloader завершен, переход на Game...");
-        this.scene.start("Game");
+        this.scene.start("WorldScene");
     }
 }
