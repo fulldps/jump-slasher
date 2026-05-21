@@ -1,3 +1,5 @@
+import { log } from "console";
+
 type PlayerState =
     | "idle"
     | "run"
@@ -18,7 +20,6 @@ const forbidden = {
 export class Player extends Phaser.Physics.Arcade.Sprite {
     private speed: number = 120;
     private jumpForce: number = -260;
-    private attackTimer: number = 0;
     private canAttack: boolean = true;
     private attackDamage: number = 20;
     private attackDuration: number = 200;
@@ -26,7 +27,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     private state: PlayerState = "idle";
 
-    private attackHitbox?: Phaser.Physics.Arcade.Rectangle;
+    private attackHitbox?: Phaser.GameObjects.Zone;
 
     constructor(scene: Phaser.Scene, x: number, y: number) {
         super(scene, x, y, "player");
@@ -146,24 +147,53 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         }
     }
 
-    //TODO handleRun()
     private handleRun(x: number) {
         this.setVelocityX(x * this.speed);
         this.setFlipX(x < 0);
     }
-    //
+
     private startAttack() {
         this.setState("attack");
         this.setVelocityX(0);
+        const zone = new Phaser.GameObjects.Zone(
+            this.scene,
+            this.x,
+            this.y,
+            8,
+            20,
+        );
+        this.attackHitbox = zone;
+        this.scene.add.existing(zone);
+        this.scene.physics.world.enable(zone);
+        const body = zone.body as Phaser.Physics.Arcade.Body;
+        body.moves = false;
         this.attackTimer = 0;
         this.canAttack = false;
+        console.log("starrrt");
+        this.handleAttack();
     }
 
-    private handleAttack() {
-        this.setState("attack");
-        console.log("attack");
-        this.setVelocityX(0);
-        this.anims.play("attack", true);
+    private handleAttack(): void {
+        if (this.attackHitbox) {
+            const offsetX = this.flipX ? -30 : 30;
+            (this.attackHitbox.body as Phaser.Physics.Arcade.Body).reset(
+                this.x + offsetX,
+                this.y,
+            );
+        }
+
+        console.log("start");
+
+        setTimeout(() => {
+            this.attackHitbox?.destroy();
+            this.attackHitbox = undefined;
+            this.attackTimer = 0;
+            this.scene.time.delayedCall(this.attackCooldownTime, () => {
+                console.log("stop");
+                this.canAttack = true;
+                this.setState("idle");
+            });
+        }, this.attackDuration);
     }
 
     private handleBlock() {
@@ -175,7 +205,8 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     private handleJump() {
         this.setVelocityY(this.jumpForce);
-        if ((this.body as Phaser.Physics.Arcade.Body).velocity.y > 0) {
+        const body = this.body as Phaser.Physics.Arcade.Body;
+        if (body.velocity.y > 0) {
             this.setState("fall");
         }
     }
@@ -193,13 +224,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     private handleHurt(): void {}
 
     private handleDead() {}
-    public update(delta: number) {
+
+    public update() {
         switch (this.state) {
             case "jump":
                 this.handleJump();
-                break;
-            case "attack":
-                this.handleAttack();
                 break;
             case "dead":
                 this.handleDead();
