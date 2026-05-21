@@ -9,8 +9,8 @@ export class WorldScene extends WorldSceneBase {
     otherPlayers: { [id: string]: Phaser.GameObjects.Sprite } = {};
 
     private addOtherPlayer(player) {
-        this.add.sprite(player.x, player.y, "player");
-        sprite.anims.play("idle", true);
+        const otherPlayer = this.add.sprite(player.x, player.y, "player");
+        otherPlayer.anims.play("idle", true);
         this.otherPlayers[player.id] = otherPlayer;
     }
 
@@ -103,7 +103,7 @@ export class WorldScene extends WorldSceneBase {
             }
         });
 
-        socket.on("PlayerMoved", (data) => {
+        socket.on("playerMoved", (data) => {
             if (this.otherPlayers[data.id]) {
                 this.otherPlayers[data.id].x = data.x;
                 this.otherPlayers[data.id].y = data.y;
@@ -113,6 +113,11 @@ export class WorldScene extends WorldSceneBase {
 
     update(): void {
         super.update();
+        socket.emit("playerMove", {
+            x: this.player.x,
+            y: this.player.y,
+            anim: "idle",
+        });
         if (this.player && this.inputManager) {
             const direction = this.inputManager.getDirection();
         }
