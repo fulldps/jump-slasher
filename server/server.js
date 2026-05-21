@@ -22,13 +22,26 @@ io.on("connection", (socket) => {
 
     socket.on("playerJoin", (data) => {
         players.set(socket.id, { ...data, id: socket.id });
+
         socket.broadcast.emit("playerJoin", {
             ...data,
             id: socket.id,
         });
+
+        socket.emit("currentPlayers", Array.from(players.values()));
     });
+
     socket.on("disconnect", () => {
+        socket.broadcast.emit("playerDisconnected", socket.id);
+        players.delete(socket.id);
         console.log("Player disconnected:", socket.id);
+    });
+
+    socket.on("playerMove", (data) => {
+        socket.broadcast.emit("playerMoved", {
+            ...data,
+            id: socket.id,
+        });
     });
 });
 

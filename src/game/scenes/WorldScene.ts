@@ -6,15 +6,11 @@ export class WorldScene extends WorldSceneBase {
         super("WorldScene");
     }
 
-    otherPlayers = [];
+    otherPlayers: { [id: string]: Phaser.GameObjects.Sprite } = {};
 
     private addOtherPlayer(player) {
-        const otherPlayer = new Player(
-            this,
-            player.x,
-            player.y,
-            SPRITES.PLAYER,
-        );
+        this.add.sprite(player.x, player.y, "player");
+        sprite.anims.play("idle", true);
         this.otherPlayers[player.id] = otherPlayer;
     }
 
@@ -86,9 +82,31 @@ export class WorldScene extends WorldSceneBase {
             name: "hero",
         });
 
-        socket.on("playerJoined", (data) => {
+        socket.on("playerJoin", (data) => {
             if (data.id !== socket.id) {
                 this.addOtherPlayer(data);
+            }
+        });
+
+        socket.on("currentPlayers", (players) => {
+            players.forEach((player) => {
+                if (player.id !== socket.id) {
+                    this.addOtherPlayer(player);
+                }
+            });
+        });
+
+        socket.on("playerDisconnected", (id) => {
+            if (this.otherPlayers[id]) {
+                this.otherPlayers[id].destroy();
+                delete this.otherPlayers[id];
+            }
+        });
+
+        socket.on("PlayerMoved", (data) => {
+            if (this.otherPlayers[data.id]) {
+                this.otherPlayers[data.id].x = data.x;
+                this.otherPlayers[data.id].y = data.y;
             }
         });
     }
