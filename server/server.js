@@ -72,7 +72,7 @@ app.get("/api/stats/:playerId", requireAuth, async (req, res) => {
 });
 
 // SPA fallback — все остальные GET отдают index.html
-app.get("*", (_req, res) => {
+app.get("/{*path}", (_req, res) => {
     res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
