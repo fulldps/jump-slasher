@@ -2,12 +2,15 @@ import io from "socket.io-client";
 import { getToken } from "./api";
 
 const SERVER_URL: string =
-    (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_SERVER_URL) ||
+    (typeof import.meta !== "undefined" &&
+        (import.meta as any).env?.VITE_SERVER_URL) ||
     window.location.origin;
 
-// auth.token передаётся при handshake — сервер читает его в socket.handshake.auth.token
+// autoConnect: false — не подключаемся при импорте модуля.
+// Подключение происходит явно в WorldScene через socket.connect()
+// Это значит MainMenu работает без бэкенда.
 const socket = io(SERVER_URL, {
-    autoConnect: true,
+    autoConnect: false,
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
     auth: { token: getToken() ?? "" },

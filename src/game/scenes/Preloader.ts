@@ -20,23 +20,65 @@ export class Preloader extends Scene {
             frameHeight: 56,
         });
 
-        // ТАЙЛМАП
-        console.log("🔄 Загрузка тайлмапа...");
-
+        // Тайлмап
         this.load.image("maintilemap", "terra-tilemap.png");
         this.load.tilemapTiledJSON("map", "terramap.json");
 
-        // Отслеживаем прогресс
+        // ── Экран загрузки (пиксель-арт стиль) ──
+
+        const w = this.scale.width;
+        const h = this.scale.height;
+
+        // Тёмный фон
+        this.add.rectangle(w / 2, h / 2, w, h, 0x0d0d1a);
+
+        // Заголовок
+        this.add
+            .text(w / 2, h / 2 - 60, "JUMP SLASHER", {
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "28px",
+                color: "#ffffff",
+                stroke: "#4c1d95",
+                strokeThickness: 6,
+            })
+            .setOrigin(0.5);
+
+        // Надпись LOADING
+        const loadingText = this.add
+            .text(w / 2, h / 2 + 10, "LOADING...", {
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "11px",
+                color: "#7c3aed",
+            })
+            .setOrigin(0.5);
+
+        // Мигание
+        this.time.addEvent({
+            delay: 400,
+            loop: true,
+            callback: () => loadingText.setVisible(!loadingText.visible),
+        });
+
+        // Прогресс-бар (пиксельный)
+        this.add
+            .rectangle(w / 2, h / 2 + 60, 300, 16, 0x1e1b4b)
+            .setStrokeStyle(2, 0x7c3aed);
+        const barFill = this.add
+            .rectangle(w / 2 - 149, h / 2 + 60, 2, 12, 0x7c3aed)
+            .setOrigin(0, 0.5);
+
+        // Процент
+        const pctText = this.add
+            .text(w / 2, h / 2 + 88, "0%", {
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: "9px",
+                color: "#4b5563",
+            })
+            .setOrigin(0.5);
+
         this.load.on("progress", (value: number) => {
-            console.log(`📊 Прогресс загрузки: ${Math.round(value * 100)}%`);
-        });
-
-        this.load.on("complete", () => {
-            console.log("Все ассеты загружены!");
-        });
-
-        this.load.on("error", (file: any) => {
-            console.error("Ошибка загрузки:", file.src);
+            barFill.setSize(Math.max(2, 298 * value), 12);
+            pctText.setText(`${Math.round(value * 100)}%`);
         });
     }
 
@@ -45,13 +87,12 @@ export class Preloader extends Scene {
             console.error("No tilemap in cache");
             return;
         }
-
         if (!this.textures.exists("maintilemap")) {
             console.error("No texture in cache");
             return;
         }
 
-        console.log("🎮 Preloader завершен, переход на Game...");
-        this.scene.start("WorldScene");
+        // Переходим в MainMenu, а не сразу в WorldScene
+        this.scene.start("MainMenu");
     }
 }
