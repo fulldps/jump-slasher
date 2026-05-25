@@ -5,12 +5,18 @@ const { Server } = require("socket.io");
 const cors = require("cors");
 
 const { register, login, requireAuth, verifyToken } = require("./auth");
-const { createMatch, saveMatchResults, getLeaderboard, getPlayerStats } = require("./stats");
+const {
+    createMatch,
+    saveMatchResults,
+    getLeaderboard,
+    getPlayerStats,
+} = require("./stats");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static("../dist"));
+const path = require("path");
+app.use(express.static(path.join(__dirname, "../dist")));
 
 const httpServer = createServer(app);
 
@@ -133,8 +139,10 @@ io.on("connection", (socket) => {
     socket.on("playerMove", (data) => {
         const player = players.get(socket.id);
         if (!player) return;
-        player.x = data.x; player.y = data.y;
-        player.flipX = data.flipX; player.anim = data.anim;
+        player.x = data.x;
+        player.y = data.y;
+        player.flipX = data.flipX;
+        player.anim = data.anim;
         socket.broadcast.emit("playerMoved", { id: socket.id, ...data });
     });
 
@@ -174,10 +182,14 @@ io.on("connection", (socket) => {
             setTimeout(() => {
                 if (!players.has(targetId)) return;
                 target.hp = MAX_HP;
-                target.x = 100; target.y = 300;
+                target.x = 100;
+                target.y = 300;
                 io.emit("playerRespawned", {
-                    id: targetId, x: target.x, y: target.y,
-                    hp: MAX_HP, maxHp: MAX_HP,
+                    id: targetId,
+                    x: target.x,
+                    y: target.y,
+                    hp: MAX_HP,
+                    maxHp: MAX_HP,
                 });
             }, 3000);
         }
