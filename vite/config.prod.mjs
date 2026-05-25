@@ -8,10 +8,9 @@ export default defineConfig({
             "@": fileURLToPath(new URL("../src", import.meta.url)),
         },
     },
-    logLevel: "warning",
+    logLevel: "info",
     build: {
-        // dist/ лежит рядом с server/, чтобы express мог serve ../dist
-        outDir: "../dist",
+        outDir: "../server/public",
         emptyOutDir: true,
         rollupOptions: {
             output: {

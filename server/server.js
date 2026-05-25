@@ -3,6 +3,7 @@ const express = require("express");
 const { createServer } = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
+const path = require("path");
 
 const { register, login, requireAuth, verifyToken } = require("./auth");
 const {
@@ -15,8 +16,9 @@ const {
 const app = express();
 app.use(cors());
 app.use(express.json());
-const path = require("path");
-app.use(express.static(path.join(__dirname, "../dist")));
+
+// Статика теперь в server/public/ — путь всегда корректен через __dirname
+app.use(express.static(path.join(__dirname, "public")));
 
 const httpServer = createServer(app);
 
@@ -50,7 +52,6 @@ app.post("/api/login", async (req, res) => {
     }
 });
 
-// requireAuth — проверяет JWT перед отдачей данных
 app.get("/api/leaderboard", async (_req, res) => {
     try {
         const rows = await getLeaderboard(10);
@@ -70,6 +71,11 @@ app.get("/api/stats/:playerId", requireAuth, async (req, res) => {
     }
 });
 
+// SPA fallback — все остальные GET отдают index.html
+app.get("*", (_req, res) => {
+    res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
 // ── ИГРОВОЕ СОСТОЯНИЕ ─────────────────────────────────────────────────────────
 
 const MAX_HP = 100;
@@ -77,10 +83,7 @@ const ATTACK_DAMAGE = 20;
 const HIT_RANGE = 60;
 const HIT_COOLDOWN = 400;
 
-// players: Map<socketId, { id, username, x, y, flipX, anim, hp, kills, deaths, lastHitTime }>
 const players = new Map();
-
-// Текущий матч: создаётся когда подключается первый игрок, закрывается при выходе последнего
 let currentMatchId = null;
 let matchPlayerCount = 0;
 
@@ -89,8 +92,6 @@ let matchPlayerCount = 0;
 io.on("connection", (socket) => {
     console.log("Connected:", socket.id);
 
-    // Клиент передаёт JWT в auth при подключении (опционально — гость без аккаунта тоже допустим)
-    // socket.handshake.auth.token
     let playerDbId = null;
     let playerUsername = "Guest";
 
@@ -101,7 +102,7 @@ io.on("connection", (socket) => {
             playerDbId = decoded.id;
             playerUsername = decoded.username;
         } catch {
-            // Невалидный токен — пускаем как гостя
+            // невалидный токен — гость
         }
     }
 
@@ -120,7 +121,6 @@ io.on("connection", (socket) => {
             lastHitTime: 0,
         });
 
-        // Открываем матч при первом игроке
         if (players.size === 1 && currentMatchId === null) {
             createMatch(1).then((id) => {
                 currentMatchId = id;
@@ -173,10 +173,8 @@ io.on("connection", (socket) => {
         });
 
         if (target.hp <= 0) {
-            // Обновляем счётчики в памяти
             attacker.kills += 1;
             target.deaths += 1;
-
             io.emit("playerDied", { id: targetId });
 
             setTimeout(() => {
@@ -201,11 +199,8 @@ io.on("connection", (socket) => {
         socket.broadcast.emit("playerDisconnected", socket.id);
         console.log("Disconnected:", socket.id, `| Online: ${players.size}`);
 
-        // Когда все вышли — сохраняем итоги матча в БД
         if (players.size === 0 && currentMatchId !== null && player) {
             const allParticipants = [];
-
-            // Текущий игрок (последний вышедший)
             if (player.dbId) {
                 allParticipants.push({
                     playerId: player.dbId,
@@ -214,12 +209,10 @@ io.on("connection", (socket) => {
                     won: false,
                 });
             }
-
             if (allParticipants.length) {
                 await saveMatchResults(currentMatchId, allParticipants);
                 console.log("Match saved:", currentMatchId);
             }
-
             currentMatchId = null;
             matchPlayerCount = 0;
         }
