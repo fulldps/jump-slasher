@@ -1,51 +1,218 @@
+require("dotenv").config();
 const express = require("express");
 const { createServer } = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
-const { disconnect } = require("cluster");
+
+const { register, login, requireAuth, verifyToken } = require("./auth");
+const { createMatch, saveMatchResults, getLeaderboard, getPlayerStats } = require("./stats");
 
 const app = express();
 app.use(cors());
+app.use(express.json());
+app.use(express.static("../dist"));
 
 const httpServer = createServer(app);
+
+const allowedOrigins = process.env.CLIENT_ORIGIN
+    ? process.env.CLIENT_ORIGIN.split(",")
+    : ["http://localhost:8080", "http://localhost:5173"];
+
 const io = new Server(httpServer, {
-    cors: {
-        origin: "http://localhost:8080",
-        methods: ["GET", "POST"],
-    },
+    cors: { origin: allowedOrigins, methods: ["GET", "POST"] },
 });
 
+// ── REST API ──────────────────────────────────────────────────────────────────
+
+app.post("/api/register", async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const player = await register(username, password);
+        res.json(player);
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+app.post("/api/login", async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const result = await login(username, password);
+        res.json(result);
+    } catch (err) {
+        res.status(401).json({ error: err.message });
+    }
+});
+
+// requireAuth — проверяет JWT перед отдачей данных
+app.get("/api/leaderboard", async (_req, res) => {
+    try {
+        const rows = await getLeaderboard(10);
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get("/api/stats/:playerId", requireAuth, async (req, res) => {
+    try {
+        const stats = await getPlayerStats(Number(req.params.playerId));
+        if (!stats) return res.status(404).json({ error: "Player not found" });
+        res.json(stats);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── ИГРОВОЕ СОСТОЯНИЕ ─────────────────────────────────────────────────────────
+
+const MAX_HP = 100;
+const ATTACK_DAMAGE = 20;
+const HIT_RANGE = 60;
+const HIT_COOLDOWN = 400;
+
+// players: Map<socketId, { id, username, x, y, flipX, anim, hp, kills, deaths, lastHitTime }>
 const players = new Map();
 
+// Текущий матч: создаётся когда подключается первый игрок, закрывается при выходе последнего
+let currentMatchId = null;
+let matchPlayerCount = 0;
+
+// ── SOCKET.IO ─────────────────────────────────────────────────────────────────
+
 io.on("connection", (socket) => {
-    console.log("Player connected:", socket.id);
+    console.log("Connected:", socket.id);
+
+    // Клиент передаёт JWT в auth при подключении (опционально — гость без аккаунта тоже допустим)
+    // socket.handshake.auth.token
+    let playerDbId = null;
+    let playerUsername = "Guest";
+
+    const token = socket.handshake.auth?.token;
+    if (token) {
+        try {
+            const decoded = verifyToken(token);
+            playerDbId = decoded.id;
+            playerUsername = decoded.username;
+        } catch {
+            // Невалидный токен — пускаем как гостя
+        }
+    }
 
     socket.on("playerJoin", (data) => {
-        players.set(socket.id, { ...data, id: socket.id });
-
-        socket.broadcast.emit("playerJoin", {
-            ...data,
+        players.set(socket.id, {
             id: socket.id,
+            dbId: playerDbId,
+            username: playerUsername,
+            x: data.x ?? 100,
+            y: data.y ?? 300,
+            flipX: data.flipX ?? false,
+            anim: data.anim ?? "idle",
+            hp: MAX_HP,
+            kills: 0,
+            deaths: 0,
+            lastHitTime: 0,
         });
 
-        socket.emit("currentPlayers", Array.from(players.values()));
-    });
+        // Открываем матч при первом игроке
+        if (players.size === 1 && currentMatchId === null) {
+            createMatch(1).then((id) => {
+                currentMatchId = id;
+                matchPlayerCount = 1;
+                console.log("Match started:", id);
+            });
+        } else {
+            matchPlayerCount = Math.max(matchPlayerCount, players.size);
+        }
 
-    socket.on("disconnect", () => {
-        socket.broadcast.emit("playerDisconnected", socket.id);
-        players.delete(socket.id);
-        console.log("Player disconnected:", socket.id);
+        socket.broadcast.emit("playerJoin", { ...players.get(socket.id) });
+        socket.emit("currentPlayers", Array.from(players.values()));
+        console.log(`Online: ${players.size}`);
     });
 
     socket.on("playerMove", (data) => {
-        socket.broadcast.emit("playerMoved", {
-            ...data,
-            id: socket.id,
+        const player = players.get(socket.id);
+        if (!player) return;
+        player.x = data.x; player.y = data.y;
+        player.flipX = data.flipX; player.anim = data.anim;
+        socket.broadcast.emit("playerMoved", { id: socket.id, ...data });
+    });
+
+    socket.on("playerAttack", () => {
+        socket.broadcast.emit("playerAttacked", { id: socket.id });
+    });
+
+    socket.on("playerHit", ({ targetId }) => {
+        const attacker = players.get(socket.id);
+        const target = players.get(targetId);
+        if (!attacker || !target) return;
+
+        const now = Date.now();
+        if (now - attacker.lastHitTime < HIT_COOLDOWN) return;
+
+        const dx = Math.abs(attacker.x - target.x);
+        const dy = Math.abs(attacker.y - target.y);
+        if (dx > HIT_RANGE || dy > HIT_RANGE / 2) return;
+
+        attacker.lastHitTime = now;
+        target.hp = Math.max(0, target.hp - ATTACK_DAMAGE);
+
+        io.emit("playerDamaged", {
+            targetId,
+            attackerId: socket.id,
+            hp: target.hp,
+            maxHp: MAX_HP,
         });
+
+        if (target.hp <= 0) {
+            // Обновляем счётчики в памяти
+            attacker.kills += 1;
+            target.deaths += 1;
+
+            io.emit("playerDied", { id: targetId });
+
+            setTimeout(() => {
+                if (!players.has(targetId)) return;
+                target.hp = MAX_HP;
+                target.x = 100; target.y = 300;
+                io.emit("playerRespawned", {
+                    id: targetId, x: target.x, y: target.y,
+                    hp: MAX_HP, maxHp: MAX_HP,
+                });
+            }, 3000);
+        }
+    });
+
+    socket.on("disconnect", async () => {
+        const player = players.get(socket.id);
+        players.delete(socket.id);
+        socket.broadcast.emit("playerDisconnected", socket.id);
+        console.log("Disconnected:", socket.id, `| Online: ${players.size}`);
+
+        // Когда все вышли — сохраняем итоги матча в БД
+        if (players.size === 0 && currentMatchId !== null && player) {
+            const allParticipants = [];
+
+            // Текущий игрок (последний вышедший)
+            if (player.dbId) {
+                allParticipants.push({
+                    playerId: player.dbId,
+                    kills: player.kills,
+                    deaths: player.deaths,
+                    won: false,
+                });
+            }
+
+            if (allParticipants.length) {
+                await saveMatchResults(currentMatchId, allParticipants);
+                console.log("Match saved:", currentMatchId);
+            }
+
+            currentMatchId = null;
+            matchPlayerCount = 0;
+        }
     });
 });
 
-const PORT = 3000;
-httpServer.listen(PORT, () => {
-    console.log(`Server running on ${PORT}`);
-});
+const PORT = process.env.PORT || 3000;
+httpServer.listen(PORT, () => console.log(`Server on port ${PORT}`));

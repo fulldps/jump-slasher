@@ -24,7 +24,9 @@
         "build": "node log.js build & vite build --config vite/config.prod.mjs",
         "dev-nolog": "vite --config vite/config.dev.mjs",
         "build-nolog": "vite build --config vite/config.prod.mjs",
-        "dev-server": "cd server && npm run dev"
+        "dev-server": "cd server && npm run dev",
+        "build:full": "vite build --config vite/config.prod.mjs && cd server && npm install",
+        "start": "cd server && node server.js"
     },
     "dependencies": {
         "phaser": "^3.90.0",

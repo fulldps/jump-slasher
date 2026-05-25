@@ -1,26 +1,8 @@
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 
-const phasermsg = () => {
-    return {
-        name: "phasermsg",
-        buildStart() {
-            process.stdout.write(`Building for production...\n`);
-        },
-        buildEnd() {
-            const line =
-                "---------------------------------------------------------";
-            const msg = `❤️❤️❤️ Tell us about your game! - games@phaser.io ❤️❤️❤️`;
-            process.stdout.write(`${line}\n${msg}\n${line}\n`);
-
-            process.stdout.write(`✨ Done ✨\n`);
-        },
-    };
-};
-
 export default defineConfig({
     base: "./",
-    plugins: [phasermsg()],
     resolve: {
         alias: {
             "@": fileURLToPath(new URL("../src", import.meta.url)),
@@ -28,6 +10,9 @@ export default defineConfig({
     },
     logLevel: "warning",
     build: {
+        // dist/ лежит рядом с server/, чтобы express мог serve ../dist
+        outDir: "../dist",
+        emptyOutDir: true,
         rollupOptions: {
             output: {
                 manualChunks: {
@@ -37,13 +22,9 @@ export default defineConfig({
         },
         minify: "terser",
         terserOptions: {
-            compress: {
-                passes: 2,
-            },
+            compress: { passes: 2 },
             mangle: true,
-            format: {
-                comments: false,
-            },
+            format: { comments: false },
         },
     },
 });

@@ -14,19 +14,17 @@ const config: Phaser.Types.Core.GameConfig = {
     physics: {
         default: "arcade",
         arcade: {
-            gravity: { y: 400 },
-            debug: true,
+            gravity: { x: 0, y: 400 }, // x обязателен в типах Phaser
+            debug: false,
         },
     },
     scale: {
-        mode: Phaser.Scale.FIT, // Игра меняет размер (для UI)
-        autoCenter: Phaser.Scale.CENTER_BOTH, // Центрирует
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
     },
     scene: [Preloader, MainMenu, WorldScene, GameOver],
 };
 
-const StartGame = (parent: string) => {
-    return new PhaserGame({ ...config, parent });
-};
+const StartGame = (parent: string) => new PhaserGame({ ...config, parent });
 
 export default StartGame;
