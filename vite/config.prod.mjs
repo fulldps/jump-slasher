@@ -10,7 +10,7 @@ export default defineConfig({
     },
     logLevel: "info",
     build: {
-        outDir: "../server/public",
+        outDir: "dist",
         emptyOutDir: true,
         rollupOptions: {
             output: {
