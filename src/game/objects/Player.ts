@@ -144,7 +144,14 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     private playStateAnim(state: PlayerState): void {
         // Проигрываем только существующую анимацию; для состояний без своей
         // анимации (hurt) просто оставляем текущий кадр + визуальный эффект.
-        if (this.anims.exists(state)) this.anims.play(state, true);
+        //
+        // ВАЖНО: проверяем ГЛОБАЛЬНЫЙ менеджер (this.scene.anims), а НЕ this.anims.
+        // AnimationState#exists(key) ищет только ЛОКАЛЬНЫЕ анимации спрайта
+        // (this.anims.has → null, т.к. все анимации созданы глобально), поэтому
+        // всегда возвращал false → play() не вызывался → локальный игрок стоял
+        // без анимаций, attack не проигрывался, событие animationcomplete-attack
+        // не приходило, isAttacking залипал в true и блокировал прыжок/локомоцию.
+        if (this.scene.anims.exists(state)) this.anims.play(state, true);
     }
 
     /** Обычный переход локомоции: не может перебить удар/урон/смерть. */
