@@ -8,19 +8,21 @@ type PlayerState =
     | "hurt"
     | "dead";
 
-const FORBIDDEN: Partial<Record<PlayerState, PlayerState[]>> = {
-    fall:   ["jump"],
-    attack: ["run"],
-    hurt:   ["run", "jump", "attack"],
-    dead:   ["idle", "run", "fall", "jump", "attack", "block", "hurt"],
-};
-
 const MAX_HP = 100;
+
+// Состояния, которые нельзя перебить обычной локомоцией (idle/run/jump/fall).
+// Удар/урон/смерть выходят из них только через явный forceState / recoverState.
+const LOCKED_STATES: ReadonlySet<PlayerState> = new Set<PlayerState>([
+    "attack",
+    "hurt",
+    "dead",
+]);
 
 export class Player extends Phaser.Physics.Arcade.Sprite {
     private speed         = 120;
     private jumpForce     = -260;
     private canAttack     = true;
+    private isAttacking   = false;
     private readonly attackDamage       = 20;
     private readonly attackDuration     = 200;
     private readonly attackCooldownTime = 500;
@@ -83,13 +85,22 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     // ── АНИМАЦИИ ────────────────────────────────────────────
+    // Спрайт-лист char_blue: 8 колонок × 7 рядов (56 кадров).
+    //   ряд 0 (0-7)   — idle
+    //   ряд 1 (8-15)  — attack (кадр 9 = block)
+    //   ряд 2 (16-23) — run
+    //   ряд 3 (24-31) — jump
+    //   ряд 6 (48-55) — лежащий персонаж (смерть)
 
     public createAnimations(): void {
         const defs = [
             { key: "idle",   start: 0,  end: 5,  frameRate: 7,  repeat: -1 },
             { key: "run",    start: 16, end: 23, frameRate: 10, repeat: -1 },
             { key: "jump",   start: 24, end: 31, frameRate: 10, repeat: 0  },
-            { key: "attack", start: 8,  end: 13, frameRate: 10, repeat: 0  },
+            // fall — держим хвост анимации прыжка (воздушная поза), пока игрок снижается
+            { key: "fall",   start: 30, end: 31, frameRate: 4,  repeat: -1 },
+            { key: "attack", start: 8,  end: 13, frameRate: 18, repeat: 0  },
+            { key: "dead",   start: 48, end: 51, frameRate: 8,  repeat: 0  },
         ] as const;
 
         defs.forEach(({ key, start, end, frameRate, repeat }) => {
@@ -119,12 +130,38 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     public getPlayerState(): PlayerState { return this._playerState; }
     public getHp(): number               { return this._hp; }
 
+    private isLocked(): boolean {
+        return LOCKED_STATES.has(this._playerState);
+    }
+
+    private playStateAnim(state: PlayerState): void {
+        // Проигрываем только существующую анимацию; для состояний без своей
+        // анимации (hurt) просто оставляем текущий кадр + визуальный эффект.
+        if (this.anims.exists(state)) this.anims.play(state, true);
+    }
+
+    /** Обычный переход локомоции: не может перебить удар/урон/смерть. */
     public setPlayerState(next: PlayerState): void {
         if (this._playerState === next) return;
-        const blocked = FORBIDDEN[next];
-        if (blocked && blocked.includes(this._playerState)) return;
+        if (this.isLocked()) return;
         this._playerState = next;
-        this.anims.play(next, true);
+        this.playStateAnim(next);
+    }
+
+    /** Принудительный переход (удар/урон/смерть/респавн) — игнорирует блокировку. */
+    private forceState(next: PlayerState): void {
+        this._playerState = next;
+        this.playStateAnim(next);
+    }
+
+    /** Пересчитать состояние локомоции из физики (после удара/урона). */
+    private recoverState(): void {
+        const body = this.body as Phaser.Physics.Arcade.Body;
+        if (!body.blocked.down) {
+            this.forceState(body.velocity.y > 10 ? "fall" : "jump");
+        } else {
+            this.forceState(Math.abs(body.velocity.x) > 1 ? "run" : "idle");
+        }
     }
 
     // ── УРОН / СМЕРТЬ / РЕСПАВН ──────────────────────────────
@@ -135,24 +172,28 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
         if (this._hp <= 0) {
             this.die();
-        } else {
-            this.setPlayerState("hurt");
-            this.scene.tweens.add({
-                targets: this,
-                alpha: 0.3,
-                duration: 80,
-                yoyo: true,
-                repeat: 2,
-                onComplete: () => {
-                    this.setAlpha(1);
-                    if (this._playerState === "hurt") this.setPlayerState("idle");
-                },
-            });
+            return;
         }
+
+        // Урон прерывает удар и кратко блокирует управление (hitstun)
+        this.cancelAttack();
+        this.forceState("hurt");
+        this.scene.tweens.add({
+            targets: this,
+            alpha: 0.3,
+            duration: 80,
+            yoyo: true,
+            repeat: 2,
+            onComplete: () => {
+                this.setAlpha(1);
+                if (this._playerState === "hurt") this.recoverState();
+            },
+        });
     }
 
     private die(): void {
-        this._playerState = "dead";
+        this.cancelAttack();
+        this.forceState("dead");
         this.setVelocity(0, 0);
         this.scene.tweens.add({
             targets: [this, this.hpBarBg, this.hpBarFill],
@@ -167,9 +208,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     public respawn(x: number, y: number, hp: number): void {
+        this.cancelAttack();
+        this.canAttack = true;
         this._hp = hp;
         this._playerState = "idle";
         this.setPosition(x, y);
+        this.setVelocity(0, 0);
         this.setAlpha(1);
         this.setVisible(true);
         this.anims.play("idle", true);
@@ -181,55 +225,109 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // ── INPUT ────────────────────────────────────────────────
 
     public processInput(dir: { x: number; y: number; jump: boolean; attack: boolean; block: boolean }): void {
-        const st = this._playerState;
-        if (st === "hurt" || st === "dead" || st === "attack") return;
+        // Урон и смерть полностью блокируют управление.
+        if (this._playerState === "hurt" || this._playerState === "dead") return;
 
-        if (dir.attack && this.canAttack) { this.startAttack(); return; }
+        const body = this.body as Phaser.Physics.Arcade.Body;
+        const onGround = body.blocked.down;
 
-        const onGround = (this.body as Phaser.Physics.Arcade.Body).blocked.down;
+        // ── Удар: из любого состояния, на земле и в воздухе, как только вызван ──
+        if (dir.attack && this.canAttack && !this.isAttacking) {
+            this.startAttack();
+        }
 
-        if (dir.jump && onGround) { this.doJump(); return; }
-
+        // ── Горизонтальное движение: доступно всегда, в т.ч. во время удара
+        //    и в воздухе (сохраняем воздушный импульс, если клавиш нет) ──
         if (dir.x !== 0) {
-            this.setPlayerState("run");
             this.setVelocityX(dir.x * this.speed);
             this.setFlipX(dir.x < 0);
-            return;
-        }
-
-        if (onGround) {
-            this.setPlayerState("idle");
+        } else if (onGround) {
             this.setVelocityX(0);
         }
+
+        // ── Прыжок: только с земли и не во время удара ──
+        if (dir.jump && onGround && !this.isAttacking) {
+            this.doJump();
+        }
+
+        // ── Визуальное состояние локомоции (не перебивает активный удар) ──
+        if (!this.isAttacking) {
+            this.updateLocomotionState(onGround, dir.x);
+        }
+    }
+
+    private updateLocomotionState(onGround: boolean, dirX: number): void {
+        const body = this.body as Phaser.Physics.Arcade.Body;
+
+        // Подъём (включая кадр самого прыжка) — jump; снижение в воздухе — fall.
+        if (body.velocity.y < -10) { this.setPlayerState("jump"); return; }
+        if (!onGround)             { this.setPlayerState(body.velocity.y > 10 ? "fall" : "jump"); return; }
+
+        this.setPlayerState(dirX !== 0 ? "run" : "idle");
     }
 
     private doJump(): void {
-        this.setPlayerState("jump");
         this.setVelocityY(this.jumpForce);
+        this.setPlayerState("jump");
     }
 
+    // ── АТАКА ────────────────────────────────────────────────
+
     private startAttack(): void {
-        this.setPlayerState("attack");
-        this.setVelocityX(0);
+        this.isAttacking = true;
         this.canAttack = false;
 
+        // Принудительно входим в атаку из любого состояния и сразу анимируем.
+        this.forceState("attack");
+
+        // Хитбокс активен только часть анимации удара.
+        this.spawnAttackHitbox();
+        this.scene.time.delayedCall(this.attackDuration, () => {
+            this.attackHitbox?.destroy();
+            this.attackHitbox = undefined;
+        });
+
+        // Конец удара привязан к завершению анимации — после него
+        // состояние пересчитывается из физики (земля/воздух/движение).
+        this.once(
+            Phaser.Animations.Events.ANIMATION_COMPLETE_KEY + "attack",
+            this.endAttack,
+            this,
+        );
+
+        // Кулдаун до следующего удара.
+        this.scene.time.delayedCall(this.attackCooldownTime, () => {
+            this.canAttack = true;
+        });
+
+        this.emit("attacked");
+    }
+
+    private endAttack(): void {
+        if (this._playerState !== "attack") return;
+        this.isAttacking = false;
+        this.recoverState();
+    }
+
+    /** Прерывает текущий удар (например, при получении урона). */
+    private cancelAttack(): void {
+        this.isAttacking = false;
+        this.off(
+            Phaser.Animations.Events.ANIMATION_COMPLETE_KEY + "attack",
+            this.endAttack,
+            this,
+        );
+        this.attackHitbox?.destroy();
+        this.attackHitbox = undefined;
+    }
+
+    private spawnAttackHitbox(): void {
         const zone = new Phaser.GameObjects.Zone(this.scene, this.x, this.y, 40, 30);
         this.attackHitbox = zone;
         this.scene.add.existing(zone);
         this.scene.physics.world.enable(zone);
         (zone.body as Phaser.Physics.Arcade.Body).moves = false;
         this.syncAttackHitbox();
-
-        this.scene.time.delayedCall(this.attackDuration, () => {
-            this.attackHitbox?.destroy();
-            this.attackHitbox = undefined;
-            this.scene.time.delayedCall(this.attackCooldownTime, () => {
-                this.canAttack = true;
-                if (this._playerState === "attack") this.setPlayerState("idle");
-            });
-        });
-
-        this.emit("attacked");
     }
 
     private syncAttackHitbox(): void {
@@ -244,18 +342,12 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     // ── UPDATE ───────────────────────────────────────────────
 
     public update(_time?: number, _delta?: number): void {
-        const body = this.body as Phaser.Physics.Arcade.Body;
-
-        if (this._playerState === "jump" && body.velocity.y > 0) this.setPlayerState("fall");
-        if (this._playerState === "fall" && body.blocked.down) {
-            this.setPlayerState(body.velocity.x !== 0 ? "run" : "idle");
-        }
-
         if (this.attackHitbox) this.syncAttackHitbox();
         this.syncHpBarPosition();
     }
 
     public destroy(fromScene?: boolean): void {
+        this.cancelAttack();
         this.hpBarBg?.destroy();
         this.hpBarFill?.destroy();
         super.destroy(fromScene);
