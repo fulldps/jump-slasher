@@ -9,8 +9,13 @@ interface RemotePlayer {
     sprite: Phaser.GameObjects.Sprite;
     hpBar: RemoteHpBar;
     hp: number;
+    // x/y — текущая (отрисованная) позиция спрайта.
+    // targetX/targetY — последняя позиция, пришедшая с сервера.
+    // Каждый кадр x/y плавно стремятся к target* (интерполяция).
     x: number;
     y: number;
+    targetX: number;
+    targetY: number;
 }
 
 export class WorldScene extends WorldSceneBase {
@@ -21,6 +26,13 @@ export class WorldScene extends WorldSceneBase {
     private otherPlayers: Map<string, RemotePlayer> = new Map();
     private lastEmitTime = 0;
     private readonly EMIT_INTERVAL = 50;
+
+    // Параметры интерполяции чужих игроков.
+    // INTERP_TAU — постоянная времени сглаживания (мс): меньше = резче/точнее,
+    // больше = плавнее, но с большим визуальным запаздыванием.
+    private readonly INTERP_TAU = 60;
+    // Дальше этого расстояния не интерполируем, а телепортируем (респавн/лаг-спайк).
+    private readonly SNAP_DISTANCE = 200;
 
     private hitTargetsThisSwing: Set<string> = new Set();
     private wasAttacking = false;
@@ -61,6 +73,8 @@ export class WorldScene extends WorldSceneBase {
             hp: data.hp ?? MAX_HP,
             x: data.x,
             y: data.y,
+            targetX: data.x,
+            targetY: data.y,
         });
     }
 
@@ -99,6 +113,25 @@ export class WorldScene extends WorldSceneBase {
                 this.hitTargetsThisSwing.add(id);
                 socket.emit("playerHit", { targetId: id });
             }
+        });
+    }
+
+    // ── INTERPOLATION ────────────────────────────────────────
+    // Каждый кадр плавно подтягиваем спрайты чужих игроков к последней
+    // позиции с сервера. Экспоненциальное сглаживание, независимое от FPS:
+    // t = 1 - e^(-dt/tau). Так движение остаётся плавным даже при редких
+    // (20/сек) и неравномерных пакетах с Render.
+
+    private interpolateOtherPlayers(delta: number): void {
+        const t = 1 - Math.exp(-delta / this.INTERP_TAU);
+
+        this.otherPlayers.forEach((r) => {
+            const nx = r.x + (r.targetX - r.x) * t;
+            const ny = r.y + (r.targetY - r.y) * t;
+            r.x = nx;
+            r.y = ny;
+            r.sprite.setPosition(nx, ny);
+            r.hpBar.moveTo(nx, ny);
         });
     }
 
@@ -184,10 +217,21 @@ export class WorldScene extends WorldSceneBase {
         socket.on("playerMoved", (data: any) => {
             const r = this.otherPlayers.get(data.id);
             if (!r) return;
-            r.sprite.setPosition(data.x, data.y).setFlipX(data.flipX ?? false);
-            r.hpBar.moveTo(data.x, data.y);
-            r.x = data.x;
-            r.y = data.y;
+
+            // Большой скачок (телепорт/рассинхрон) — снэпим, иначе интерполируем.
+            const dist = Phaser.Math.Distance.Between(r.x, r.y, data.x, data.y);
+            if (dist > this.SNAP_DISTANCE) {
+                r.x = data.x;
+                r.y = data.y;
+                r.sprite.setPosition(data.x, data.y);
+                r.hpBar.moveTo(data.x, data.y);
+            }
+
+            // Целевую позицию обновляем всегда — к ней спрайт стремится в update().
+            r.targetX = data.x;
+            r.targetY = data.y;
+
+            r.sprite.setFlipX(data.flipX ?? false);
             if (data.anim && r.sprite.anims.currentAnim?.key !== data.anim) {
                 r.sprite.anims.play(data.anim, true);
             }
@@ -254,6 +298,8 @@ export class WorldScene extends WorldSceneBase {
                     r.hp = data.hp;
                     r.x = data.x;
                     r.y = data.y;
+                    r.targetX = data.x;
+                    r.targetY = data.y;
                     r.sprite
                         .setPosition(data.x, data.y)
                         .setAlpha(0.9)
@@ -269,6 +315,7 @@ export class WorldScene extends WorldSceneBase {
     update(time: number, delta: number): void {
         super.update(time, delta);
         this.checkAttackHits();
+        this.interpolateOtherPlayers(delta);
 
         if (time - this.lastEmitTime > this.EMIT_INTERVAL) {
             this.lastEmitTime = time;
