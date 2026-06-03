@@ -1,6 +1,7 @@
 import { Preloader } from "./scenes/Preloader";
 import { MainMenu } from "./scenes/MainMenu";
 import { WorldScene } from "./scenes/WorldScene";
+import { HudScene } from "./scenes/HudScene";
 import { GameOver } from "./scenes/GameOver";
 import { AUTO, Game as PhaserGame } from "phaser";
 
@@ -23,7 +24,7 @@ const config: Phaser.Types.Core.GameConfig = {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
     },
-    scene: [Preloader, MainMenu, WorldScene, GameOver],
+    scene: [Preloader, MainMenu, WorldScene, HudScene, GameOver],
 };
 
 const StartGame = (parent: string) => new PhaserGame({ ...config, parent });

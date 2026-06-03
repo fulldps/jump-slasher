@@ -87,6 +87,20 @@ const players = new Map();
 let currentMatchId = null;
 let matchPlayerCount = 0;
 
+// Живой скорборд — список всех игроков (включая гостей), отсортированный по килам.
+// Шлём его всем при входе, после убийства и при выходе игрока.
+function broadcastScoreboard() {
+    const rows = Array.from(players.values())
+        .map((p) => ({
+            id: p.id,
+            name: p.username,
+            kills: p.kills,
+            deaths: p.deaths,
+        }))
+        .sort((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+    io.emit("scoreboard", rows);
+}
+
 // ── SOCKET.IO ─────────────────────────────────────────────────────────────────
 
 io.on("connection", (socket) => {
@@ -107,10 +121,16 @@ io.on("connection", (socket) => {
     }
 
     socket.on("playerJoin", (data) => {
+        // Имя для отображения: у авторизованных — из токена, у гостей — то,
+        // что прислал клиент (иначе все гости были бы безликими "Guest").
+        const displayName = playerDbId
+            ? playerUsername
+            : (data.name || "Guest");
+
         players.set(socket.id, {
             id: socket.id,
             dbId: playerDbId,
-            username: playerUsername,
+            username: displayName,
             x: data.x ?? 100,
             y: data.y ?? 300,
             flipX: data.flipX ?? false,
@@ -133,6 +153,7 @@ io.on("connection", (socket) => {
 
         socket.broadcast.emit("playerJoin", { ...players.get(socket.id) });
         socket.emit("currentPlayers", Array.from(players.values()));
+        broadcastScoreboard();
         console.log(`Online: ${players.size}`);
     });
 
@@ -176,6 +197,7 @@ io.on("connection", (socket) => {
             attacker.kills += 1;
             target.deaths += 1;
             io.emit("playerDied", { id: targetId });
+            broadcastScoreboard();
 
             setTimeout(() => {
                 if (!players.has(targetId)) return;
@@ -197,6 +219,7 @@ io.on("connection", (socket) => {
         const player = players.get(socket.id);
         players.delete(socket.id);
         socket.broadcast.emit("playerDisconnected", socket.id);
+        broadcastScoreboard();
         console.log("Disconnected:", socket.id, `| Online: ${players.size}`);
 
         if (players.size === 0 && currentMatchId !== null && player) {

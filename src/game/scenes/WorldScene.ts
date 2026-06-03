@@ -1,5 +1,6 @@
 import { WorldSceneBase } from "./WorldSceneBase";
 import { RemoteHpBar } from "../objects/RemoteHpBar";
+import { HudScene } from "./HudScene";
 import { getUsername } from "../../utils/api";
 import socket from "../../utils/socket";
 
@@ -141,6 +142,10 @@ export class WorldScene extends WorldSceneBase {
         // Подключаемся к серверу только при входе в игровую сцену
         socket.connect();
 
+        // HUD-оверлей со скорбордом — отдельная сцена поверх игровой
+        // (её камера без zoom, чтобы счёт оставался в углу и не искажался).
+        this.scene.launch("HudScene");
+
         this.createBase();
 
         const map = this.make.tilemap({ key: "map" });
@@ -213,6 +218,11 @@ export class WorldScene extends WorldSceneBase {
         socket.on("playerDisconnected", (id: string) =>
             this.removeOtherPlayer(id),
         );
+
+        socket.on("scoreboard", (rows: any[]) => {
+            const hud = this.scene.get("HudScene") as HudScene;
+            hud?.setScoreboard(rows, socket.id ?? "");
+        });
 
         socket.on("playerMoved", (data: any) => {
             const r = this.otherPlayers.get(data.id);
@@ -332,12 +342,14 @@ export class WorldScene extends WorldSceneBase {
         socket.off("currentPlayers");
         socket.off("playerJoin");
         socket.off("playerDisconnected");
+        socket.off("scoreboard");
         socket.off("playerMoved");
         socket.off("playerAttacked");
         socket.off("playerDamaged");
         socket.off("playerDied");
         socket.off("playerRespawned");
         this.otherPlayers.forEach((_, id) => this.removeOtherPlayer(id));
+        this.scene.stop("HudScene");
         socket.disconnect();
         super.shutdown();
     }

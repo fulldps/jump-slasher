@@ -93,6 +93,13 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     //   ряд 6 (48-55) — лежащий персонаж (смерть)
 
     public createAnimations(): void {
+        // ВАЖНО: создаём анимации в ГЛОБАЛЬНОМ менеджере (this.scene.anims),
+        // а не локально на спрайте (this.anims.create — локальные анимации,
+        // см. Phaser AnimationState#create). Иначе их видит только спрайт
+        // локального игрока, а чужие игроки (обычные Sprite) не находят ключи
+        // run/idle/jump → anims.play молча ничего не делает → стоят на месте.
+        const anims = this.scene.anims;
+
         const defs = [
             { key: "idle",   start: 0,  end: 5,  frameRate: 7,  repeat: -1 },
             { key: "run",    start: 16, end: 23, frameRate: 10, repeat: -1 },
@@ -104,18 +111,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         ] as const;
 
         defs.forEach(({ key, start, end, frameRate, repeat }) => {
-            if (!this.anims.exists(key)) {
-                this.anims.create({
+            if (!anims.exists(key)) {
+                anims.create({
                     key,
-                    frames: this.anims.generateFrameNumbers("player", { start, end }),
+                    frames: anims.generateFrameNumbers("player", { start, end }),
                     frameRate,
                     repeat,
                 });
             }
         });
 
-        if (!this.anims.exists("block")) {
-            this.anims.create({
+        if (!anims.exists("block")) {
+            anims.create({
                 key: "block",
                 frames: [{ key: "player", frame: 9 }],
                 frameRate: 1,
@@ -209,6 +216,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     public respawn(x: number, y: number, hp: number): void {
         this.cancelAttack();
+        // die() анимирует alpha игрока И полосок HP в 0 — снимаем эти твины,
+        // иначе они могут «доиграть» и снова спрятать спрайт/полоску после респавна.
+        this.scene.tweens.killTweensOf([this, this.hpBarBg, this.hpBarFill]);
         this.canAttack = true;
         this._hp = hp;
         this._playerState = "idle";
@@ -218,8 +228,11 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
         this.setVisible(true);
         this.anims.play("idle", true);
         this.redrawHpFill();
-        this.hpBarBg.setVisible(true);
-        this.hpBarFill.setVisible(true);
+        this.syncHpBarPosition();
+        // Возвращаем alpha полосок в 1 — die() увёл его в 0; setVisible(true)
+        // без сброса alpha оставлял полоску HP невидимой после первой смерти.
+        this.hpBarBg.setAlpha(1).setVisible(true);
+        this.hpBarFill.setAlpha(1).setVisible(true);
     }
 
     // ── INPUT ────────────────────────────────────────────────
@@ -236,12 +249,15 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
             this.startAttack();
         }
 
-        // ── Горизонтальное движение: доступно всегда, в т.ч. во время удара
-        //    и в воздухе (сохраняем воздушный импульс, если клавиш нет) ──
+        // ── Горизонтальное движение: доступно всегда, в т.ч. во время удара ──
+        // Отпустили клавишу → сразу останавливаемся (и на земле, и в воздухе).
+        // Раньше остановка была только `else if (onGround)`, но blocked.down
+        // кратко мигает false на стыках тайлов → персонаж «доезжал» вперёд
+        // после отпускания кнопки. Теперь управление отзывчивое, без инерции.
         if (dir.x !== 0) {
             this.setVelocityX(dir.x * this.speed);
             this.setFlipX(dir.x < 0);
-        } else if (onGround) {
+        } else {
             this.setVelocityX(0);
         }
 
