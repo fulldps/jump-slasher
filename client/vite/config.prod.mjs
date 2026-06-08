@@ -10,7 +10,10 @@ export default defineConfig({
     },
     logLevel: "info",
     build: {
-        outDir: "dist",
+        // Бандл кладём прямо в server/public — сервер раздаёт статику оттуда
+        // (server.js: express.static(__dirname/public) + SPA-fallback).
+        // Путь относительно корня vite (папки client/).
+        outDir: "../server/public",
         emptyOutDir: true,
         rollupOptions: {
             output: {

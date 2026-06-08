@@ -1,11 +1,5 @@
 import { Scene } from "phaser";
-
-interface ScoreRow {
-    id: string;
-    name: string;
-    kills: number;
-    deaths: number;
-}
+import type { ScoreRow } from "@jump-slasher/shared/events";
 
 const FONT = "'Press Start 2P', monospace";
 

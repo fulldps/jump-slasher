@@ -2,8 +2,10 @@ services:
   - type: web
     name: jump-slasher
     env: node
-    buildCommand: npm install && npm run build && cd server && npm install
-    startCommand: cd server && node server.js
+    # Один npm install в корне поднимает все workspaces (client/server/shared),
+    # build собирает клиент прямо в server/public, сервер раздаёт его оттуда.
+    buildCommand: npm install && npm run build
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production

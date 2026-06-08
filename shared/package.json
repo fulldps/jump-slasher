@@ -1,0 +1,10 @@
+{
+    "name": "@jump-slasher/shared",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Shared client↔server contracts (Socket.IO event payloads). Type-only — no runtime code.",
+    "type": "module",
+    "exports": {
+        "./events": "./events.ts"
+    }
+}

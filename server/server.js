@@ -13,6 +13,12 @@ const {
     getPlayerStats,
 } = require("./stats");
 
+// Контракт сокет-протокола — единый источник истины с клиентом (shared/events.ts).
+// Через эти typedef'ы io/socket типизируются, и tsc (npm run typecheck) ловит
+// рассинхрон emit/on с фронтом. На рантайм не влияет — JSDoc стирается.
+/** @typedef {import('@jump-slasher/shared/events').ClientToServerEvents} ClientToServerEvents */
+/** @typedef {import('@jump-slasher/shared/events').ServerToClientEvents} ServerToClientEvents */
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -26,9 +32,12 @@ const allowedOrigins = process.env.CLIENT_ORIGIN
     ? process.env.CLIENT_ORIGIN.split(",")
     : ["http://localhost:8080", "http://localhost:5173"];
 
-const io = new Server(httpServer, {
-    cors: { origin: allowedOrigins, methods: ["GET", "POST"] },
-});
+const io =
+    /** @type {import('socket.io').Server<ClientToServerEvents, ServerToClientEvents>} */ (
+        new Server(httpServer, {
+            cors: { origin: allowedOrigins, methods: ["GET", "POST"] },
+        })
+    );
 
 // ── REST API ──────────────────────────────────────────────────────────────────
 
@@ -183,7 +192,24 @@ io.on("connection", (socket) => {
         const dy = Math.abs(attacker.y - target.y);
         if (dx > HIT_RANGE || dy > HIT_RANGE / 2) return;
 
+        // Свинг состоялся — кулдаун расходуется даже если удар будет заблокирован.
         attacker.lastHitTime = now;
+
+        // ── Блок ──
+        // Цель блокирует (anim === "block") и СМОТРИТ на атакующего → урон поглощён.
+        // flipX === true означает «лицом влево». Удар со спины блок не спасает.
+        if (target.anim === "block") {
+            const attackerOnLeft = attacker.x < target.x;
+            const targetFacingLeft = !!target.flipX;
+            if (attackerOnLeft === targetFacingLeft) {
+                io.emit("playerBlocked", {
+                    targetId,
+                    attackerId: socket.id,
+                });
+                return;
+            }
+        }
+
         target.hp = Math.max(0, target.hp - ATTACK_DAMAGE);
 
         io.emit("playerDamaged", {

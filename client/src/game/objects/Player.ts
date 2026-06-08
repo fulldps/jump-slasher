@@ -23,7 +23,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     private jumpForce     = -260;
     private canAttack     = true;
     private isAttacking   = false;
-    private readonly attackDamage       = 20;
     private readonly attackDuration     = 200;
     private readonly attackCooldownTime = 500;
 
@@ -244,12 +243,21 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
 
     // ── INPUT ────────────────────────────────────────────────
 
-    public processInput(dir: { x: number; y: number; jump: boolean; attack: boolean; block: boolean }): void {
+    public processInput(dir: { x: number; jump: boolean; attack: boolean; block: boolean }): void {
         // Урон и смерть полностью блокируют управление.
         if (this._playerState === "hurt" || this._playerState === "dead") return;
 
         const body = this.body as Phaser.Physics.Arcade.Body;
         const onGround = body.blocked.down;
+
+        // ── Блок: удержание K на земле, не во время удара ──
+        // Корнит игрока: пока блокируешь — нельзя двигаться, прыгать и атаковать.
+        // Само поглощение урона считает сервер (он знает, кто кого бьёт и куда смотрит).
+        if (dir.block && onGround && !this.isAttacking) {
+            this.setVelocityX(0);
+            this.setPlayerState("block");
+            return;
+        }
 
         // ── Удар: из любого состояния, на земле и в воздухе, как только вызван ──
         if (dir.attack && this.canAttack && !this.isAttacking) {
@@ -360,7 +368,6 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     }
 
     public getAttackHitbox(): Phaser.GameObjects.Zone | undefined { return this.attackHitbox; }
-    public getAttackDamage(): number { return this.attackDamage; }
 
     // ── UPDATE ───────────────────────────────────────────────
 

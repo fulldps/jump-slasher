@@ -12,9 +12,13 @@ lerna-debug.log*
 
 node_modules
 .DS_Store
+dist
 dist-ssr
 coverage
 *.local
+
+# Сборка клиента (генерится vite'ом, раздаётся сервером)
+server/public
 
 /cypress/videos/
 /cypress/screenshots/
